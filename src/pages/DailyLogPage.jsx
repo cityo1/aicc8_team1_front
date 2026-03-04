@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import {
     Box, Paper, Typography, IconButton, Divider,
@@ -119,11 +119,50 @@ function NutrientBar({ label, value, daily, color }) {
 }
 
 // ─── 식사 카드 ────────────────────────────────────────────────────────────────
-function MealCard({ meal, data, isToday }) {
+function MealCard({ meal, data, isToday, dateStr }) {
     const [open, setOpen] = useState(false);
     const [memo, setMemo] = useState(data?.memo || '');
+    const [image, setImage] = useState(null);
+    const fileInputRef = useRef(null);
     const totalCal = getMealTotalCalories(data);
     const { Icon, color, bg, darkColor } = meal;
+
+    const storageKey = `mealImage_${dateStr}_${meal.key}`;
+
+    // localStorage에서 이미지 불러오기
+    useEffect(() => {
+        const savedImage = localStorage.getItem(storageKey);
+        if (savedImage) {
+            setImage(savedImage);
+        } else {
+            setImage(null);
+        }
+    }, [storageKey]);
+
+    const handleImageClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleImageChange = (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const imageData = event.target.result;
+                setImage(imageData);
+                localStorage.setItem(storageKey, imageData);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleImageRemove = () => {
+        setImage(null);
+        localStorage.removeItem(storageKey);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
 
     return (
         <Paper
@@ -205,17 +244,56 @@ function MealCard({ meal, data, isToday }) {
                     <Typography variant="body2" fontWeight={700} mb={1} color="text.secondary">
                         사진
                     </Typography>
-                    <Box
-                        sx={{
-                            border: '2px dashed #e2e8f0', borderRadius: 2, p: 3,
-                            display: 'flex', flexDirection: 'column', alignItems: 'center',
-                            cursor: 'pointer', mb: 2, transition: '0.2s',
-                            '&:hover': { borderColor: color, bgcolor: bg },
-                        }}
-                    >
-                        <AddPhotoAlternate sx={{ fontSize: 32, color: '#cbd5e1', mb: 0.5 }} />
-                        <Typography variant="caption" color="text.disabled">사진을 추가하세요</Typography>
-                    </Box>
+                    <input
+                        type="file"
+                        accept="image/*"
+                        ref={fileInputRef}
+                        onChange={handleImageChange}
+                        style={{ display: 'none' }}
+                    />
+                    {image ? (
+                        <Box sx={{ position: 'relative', mb: 2 }}>
+                            <Box
+                                component="img"
+                                src={image}
+                                alt="식사 사진"
+                                sx={{
+                                    width: '100%',
+                                    maxHeight: 200,
+                                    objectFit: 'cover',
+                                    borderRadius: 2,
+                                    border: `2px solid ${color}`,
+                                }}
+                            />
+                            <IconButton
+                                size="small"
+                                onClick={handleImageRemove}
+                                sx={{
+                                    position: 'absolute',
+                                    top: 8,
+                                    right: 8,
+                                    bgcolor: 'rgba(0,0,0,0.5)',
+                                    color: '#fff',
+                                    '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
+                                }}
+                            >
+                                <DeleteOutline fontSize="small" />
+                            </IconButton>
+                        </Box>
+                    ) : (
+                        <Box
+                            onClick={handleImageClick}
+                            sx={{
+                                border: '2px dashed #e2e8f0', borderRadius: 2, p: 3,
+                                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                                cursor: 'pointer', mb: 2, transition: '0.2s',
+                                '&:hover': { borderColor: color, bgcolor: bg },
+                            }}
+                        >
+                            <AddPhotoAlternate sx={{ fontSize: 32, color: '#cbd5e1', mb: 0.5 }} />
+                            <Typography variant="caption" color="text.disabled">사진을 추가하세요</Typography>
+                        </Box>
+                    )}
 
                     {/* 영양소 */}
                     {data?.nutrients && (
@@ -743,7 +821,7 @@ export default function DailyLogPage() {
                 }}
             >
                 {/* ── 왼쪽: 달력 패널 ── */}
-                <Box sx={{ width: { xs: '100%', md: 300 }, flexShrink: 0 }}>
+                <Box sx={{ width: { xs: '100%', md: 400, lg: 500 }, flexShrink: 0 }}>
                     <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: '1px solid #e8ecf0' }}>
                         <CustomCalendar
                             selectedDate={selectedDate}
@@ -799,7 +877,7 @@ export default function DailyLogPage() {
 
                                 {/* 식사 카드 */}
                                 <Box sx={{ flexGrow: 1, pb: index < MEALS.length - 1 ? 1.5 : 0 }}>
-                                    <MealCard meal={meal} data={dayData?.[meal.key]} isToday={isToday} />
+                                    <MealCard meal={meal} data={dayData?.[meal.key]} isToday={isToday} dateStr={dateStr} />
                                 </Box>
                             </Box>
                         ))}
