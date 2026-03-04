@@ -225,7 +225,7 @@ const App = () => {
                 </button>
                 <button
                   className="bg-[#1E2923] text-white py-5 rounded-3xl font-bold flex items-center justify-center gap-2 hover:bg-[#2a3a31] transition-all shadow-lg active:scale-95"
-                  onClick={() => navigate('/dailyLog')}
+                  onClick={() => navigate('/home/dailyLog')}
                 >
                   기록하기 <ChevronRight size={20} />
                 </button>

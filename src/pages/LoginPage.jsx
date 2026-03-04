@@ -51,7 +51,7 @@ export default function LoginPage() {
         try {
             const response = await authApi.login(form.email, form.password);
             auth.login(response.token, response.user);
-            navigate('/');
+            navigate('/home');
         } catch (err) {
             setError(err.message);
         } finally {

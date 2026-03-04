@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Layout } from './components/common';
 import { AuthProvider } from './contexts/AuthContext';
+import LandingPage from './pages/LandingPage';
 import HomePage from './components/home/HomePage';
 import PlaceholderPage from './pages/PlaceholderPage';
 import DailyLogPage from './pages/DailyLogPage';
@@ -15,12 +16,15 @@ function App() {
     <AuthProvider>
     <BrowserRouter>
       <Routes>
+        {/* 랜딩 페이지 (첫 진입) */}
+        <Route path="/" element={<LandingPage />} />
+
         {/* 인증 페이지 (Layout 없이 전체 화면) */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 
         {/* 메인 앱 (Layout 포함) */}
-        <Route path="/" element={<Layout />}>
+        <Route path="/home" element={<Layout />}>
           <Route index element={<HomePage />} />
           <Route path="recommendation" element={<RecommendPage />} />
           <Route path="scanAnalysis" element={<ScanAnalysisPage />} />

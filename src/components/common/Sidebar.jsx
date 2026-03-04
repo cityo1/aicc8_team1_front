@@ -18,28 +18,28 @@ const Sidebar = () => {
   const navigate = useNavigate();
 
   const menuItems = [
-    { path: '/', icon: <Home size={20} />, label: '홈' },
+    { path: '/home', icon: <Home size={20} />, label: '홈' },
     {
-      path: '/recommendation',
+      path: '/home/recommendation',
       icon: <Utensils size={20} />,
       label: '식단추천',
     },
-    { path: '/scanAnalysis', icon: <Search size={20} />, label: 'AI 식단분석' },
+    { path: '/home/scanAnalysis', icon: <Search size={20} />, label: 'AI 식단분석' },
     {
-      path: '/dailyLog',
+      path: '/home/dailyLog',
       icon: <ClipboardList size={20} />,
       label: '일일식사기록',
     },
     {
-      path: '/report',
+      path: '/home/report',
       icon: <BarChart3 size={20} />,
       label: '주간/월간리포트',
     },
   ];
 
   const bottomItems = [
-    { path: '/notifications', icon: <Bell size={18} />, label: '알림' },
-    { path: '/settings', icon: <Settings size={18} />, label: '환경설정' },
+    { path: '/home/notifications', icon: <Bell size={18} />, label: '알림' },
+    { path: '/home/settings', icon: <Settings size={18} />, label: '환경설정' },
   ];
 
   const navLinkClass = ({ isActive }) =>
