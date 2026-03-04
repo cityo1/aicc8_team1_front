@@ -18,7 +18,7 @@ import {
   Line,
 } from 'recharts';
 
-// 1. 방사형 차트
+// 1. 방사형 차트a
 export const NutrientRadarChart = ({ data }) => (
   <ResponsiveContainer width="100%" height={300}>
     <RadarChart
