@@ -9,44 +9,65 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { analyzeFoodImage } from '../../api/scan';
 
 const App = () => {
   const [step, setStep] = useState('upload'); // upload, scanning, result
   const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [analysis, setAnalysis] = useState(null);
+  const [error, setError] = useState(null);
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
-  const mockAnalysis = {
-    foodName: '아보카도 연어 샐러드',
-    calories: 450,
-    macros: { protein: 25, fat: 30, carbs: 15, sugar: 10 },
-    score: 85,
-    tips: '오메가-3가 풍부한 식단입니다. 식이섬유 보충을 위해 통곡물 빵 한 조각을 곁들이면 더 좋습니다.',
-  };
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
+      setError(null);
+      setSelectedFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setSelectedImage(reader.result);
-        startScanning();
+        startScanning(file);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const startScanning = () => {
+  const startScanning = async (file) => {
     setStep('scanning');
-    setTimeout(() => {
-      setAnalysis(mockAnalysis);
-      setStep('result');
-    }, 3500);
+    try {
+      const res = await analyzeFoodImage(file);
+      const { foods, totalCalories } = res;
+      const protein = foods.reduce((s, f) => s + (Number(f.protein) || 0), 0);
+      const fat = foods.reduce((s, f) => s + (Number(f.fat) || 0), 0);
+      const carbs = foods.reduce((s, f) => s + (Number(f.carbohydrate) || 0), 0);
+      const sugar = foods.reduce((s, f) => s + (Number(f.sugars) || 0), 0);
+      setAnalysis({
+        foodName: foods.map((f) => f.name).join(', ') || '분석된 음식',
+        calories: totalCalories,
+        macros: { protein, fat, carbs, sugar },
+        score: 85,
+        tips: foods.length > 1
+          ? `총 ${foods.length}종의 음식이 분석되었습니다.`
+          : '영양 균형을 위해 다양한 식재료를 곁들이면 좋습니다.',
+        rawFoods: foods,
+      });
+    } catch (err) {
+      setError(err.message || '분석 중 오류가 발생했습니다.');
+      setStep('upload');
+      setSelectedImage(null);
+      setSelectedFile(null);
+      return;
+    }
+    setStep('result');
   };
 
   const resetScanner = () => {
     setSelectedImage(null);
+    setSelectedFile(null);
     setAnalysis(null);
+    setError(null);
     setStep('upload');
   };
 
@@ -67,6 +88,13 @@ const App = () => {
       <main
         className={`w-full  flex-1 flex flex-col justify-center ${step === 'result' ? 'max-w-5xl' : 'max-w-lg'}`}
       >
+        {/* 에러 표시 */}
+        {error && (
+          <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-2xl text-sm font-medium">
+            {error}
+          </div>
+        )}
+
         {/* Step 1: Upload */}
         {step === 'upload' && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-500">
@@ -139,12 +167,35 @@ const App = () => {
         {/* Step 3: Result */}
         {step === 'result' && analysis && (
           <div className="flex items-stretch gap-5">
-            <div className="flex-1 min-w-0 rounded-3xl overflow-hidden ring-4 ring-orange-50">
+            <div className="flex-1 min-w-0 rounded-3xl overflow-hidden ring-4 ring-orange-50 relative">
               <img
                 src={selectedImage}
                 className="w-full h-full object-cover min-h-full"
                 alt="Food"
               />
+              {analysis.rawFoods?.some((f) => f.bbox) && (
+                <div className="absolute inset-0 pointer-events-none">
+                  {analysis.rawFoods.map(
+                    (food, i) =>
+                      food.bbox && (
+                        <div
+                          key={i}
+                          className="absolute border-2 border-yellow-400 bg-yellow-400/20"
+                          style={{
+                            left: `${food.bbox.x ?? food.bbox.left ?? 0}%`,
+                            top: `${food.bbox.y ?? food.bbox.top ?? 0}%`,
+                            width: `${food.bbox.w ?? food.bbox.width ?? 10}%`,
+                            height: `${food.bbox.h ?? food.bbox.height ?? 10}%`,
+                          }}
+                        >
+                          <span className="absolute -top-6 left-0 text-xs font-bold text-yellow-900 bg-yellow-200/95 px-1.5 py-0.5 rounded whitespace-nowrap">
+                            {food.name}
+                          </span>
+                        </div>
+                      )
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex-1 min-w-0 space-y-5 animate-in fade-in slide-in-from-bottom-6 duration-700">
               <div className="bg-white rounded-3xl p-7 shadow-xl border border-slate-100 relative">
