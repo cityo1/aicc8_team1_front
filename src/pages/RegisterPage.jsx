@@ -209,7 +209,17 @@ export default function RegisterPage() {
         // setLoading(false);
         // setStep(3);
         try {
-            await authApi.signup(form.email, form.password, profile.nickname);
+            await authApi.signup(
+                form.email,
+                form.password,
+                profile.nickname,
+                profile.gender,
+                profile.ageGroup,
+                parseFloat(profile.height) || null,
+                parseFloat(profile.weight) || null,
+                profile.goals,
+                profile.dietary
+            );
             setStep(3);
         } catch (err) {
             setError(err.message);
