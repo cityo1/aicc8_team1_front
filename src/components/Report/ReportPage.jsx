@@ -1,11 +1,16 @@
-import React from 'react';
+import React, { useRef } from 'react';
+import { toPng } from 'html-to-image';
+import { jsPDF } from 'jspdf';
 import {
   NutrientRadarChart,
   GoalBarChart,
   WeeklyLineChart,
 } from './ReportCharts';
+import { PiChefHat } from 'react-icons/pi';
 
 const ReportPage = () => {
+  const reportRef = useRef(null);
+
   // 샘플 데이터
   const radarData = [
     { subject: '탄수화물', value: 80 },
@@ -90,88 +95,166 @@ const ReportPage = () => {
     },
   ];
 
+  // PDF 저장 함수
+  const handleDownloadPdf = async () => {
+    if (reportRef.current === null) return;
+    try {
+      const dataUrl = await toPng(reportRef.current, {
+        cacheBust: true,
+        backgroundColor: '#ffffff',
+        pixelRatio: 3,
+      });
+      const pdf = new jsPDF('l', 'mm', 'a4');
+      const imgProps = pdf.getImageProperties(dataUrl);
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const scale = 1;
+      const imgWidth = pageWidth * scale;
+      const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+      const marginLeft = (pageWidth - imgWidth) / 2;
+      const marginTop = (pageHeight - imgHeight) / 2;
+      pdf.addImage(dataUrl, 'PNG', marginLeft, marginTop, imgWidth, imgHeight);
+      pdf.save(`영양리포트_${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch (err) {
+      console.error('PDF 생성 오류:', err);
+      alert('PDF 생성 중 오류가 발생했습니다.');
+    }
+  };
+
   return (
-    <div className="p-6 bg-[#F2F9F5] min-h-screen text-[#1E2923]">
-      {/* 상단 헤더 섹션 */}
-      <div className="flex justify-between items-center mb-6">
-        <div className="bg-white flex p-4 rounded-lg shadow-sm flex-1 mr-4 border-l-4 border-[#FF8243]">
-          <p className="font-semibold text-gray-600">
-            홍길동 님의 영양 점수는{' '}
-            <span className="text-[#FF8243] font-bold text-xl">85점</span>{' '}
-            입니다. <span className="ml-4 text-green-500">▲ 5</span>
-          </p>
+    <div className="p-2 min-h-screen">
+      <div
+        ref={reportRef}
+        className=" bg-[#F2F9F5] text-[#1E2923] w-full mx-auto rounded-2xl border border-gray-100 p-6"
+      >
+        <div className="grid grid-cols-24 gap-6">
+          <div className="col-span-16 flex flex-col gap-6">
+            {/* 상단 요약 카드 */}
+            <div className="bg-white flex justify-between items-center p-6 rounded-xl shadow-sm border-l-8 border-[#FF8243]">
+              <h2 className="font-semibold text-gray-700 text-lg flex-shrink-0 mr-4">
+                <span className="text-gray-900 font-bold">홍길동</span> 님의
+                영양 점수는{' '}
+                <span className="text-[#FF8243] font-bold text-[22px]">
+                  85점
+                </span>{' '}
+                입니다.
+              </h2>
+
+              {/* 대비 섹션: 같은 줄 유지 */}
+              <div className="flex items-center gap-3 flex-shrink-0">
+                {/* 지난 주 대비 */}
+                <div className="flex items-center whitespace-nowrap gap-2">
+                  <span className="text-gray-500 text-sm flex-shrink-0">
+                    지난 주 대비
+                  </span>
+                  <div className="flex items-center gap-1.5 min-w-[100px]">
+                    <span className="text-gray-700 font-bold text-[15px]">
+                      - <span>10.30</span>점
+                    </span>
+                    <span className="text-sky-400 font-bold text-[15px]">
+                      ▼ <span>4.0</span>%
+                    </span>
+                  </div>
+                </div>
+
+                {/* 구분선 */}
+                <div className="w-[2px] h-7 bg-gray-200"></div>
+
+                {/* 지난 달 대비 */}
+                <div className="flex items-center whitespace-nowrap gap-2">
+                  <span className="text-gray-500 text-sm flex-shrink-0">
+                    지난 달 대비
+                  </span>
+                  <div className="flex items-center gap-1.5 min-w-[100px]">
+                    <span className="text-gray-700 font-bold text-[15px]">
+                      + <span>5.21</span>점
+                    </span>
+                    <span className="text-emerald-500 font-bold text-[15px]">
+                      ▲ <span>9.8</span>%
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 영양 밸런스, 목표 달성률 */}
+            <div className="grid grid-cols-10 gap-6">
+              <div className="col-span-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <h3 className="font-bold mb-6 text-gray-800 border-b pb-2">
+                  영양 밸런스
+                </h3>
+                <NutrientRadarChart data={radarData} />
+              </div>
+              <div className="col-span-6 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <h3 className="font-bold mb-6 text-gray-800 border-b pb-2">
+                  목표 달성률
+                </h3>
+                <GoalBarChart data={barData} />
+              </div>
+            </div>
+
+            {/* 7일간 변화 추이 */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <h3 className="font-bold mb-6 text-gray-800 border-b pb-2">
+                7일간 변화 추이
+              </h3>
+              <WeeklyLineChart data={lineData} />
+            </div>
+          </div>
+
+          {/* AI 리뷰 */}
+          <div className="col-span-8 bg-white p-8 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
+            <h3 className="font-bold text-xl mb-6 flex items-center text-gray-800">
+              <span className="mr-2">
+                <PiChefHat size={25} color="#FF8243" />
+              </span>{' '}
+              AI 영양사 리뷰
+            </h3>
+            <div className="flex-1 space-y-6 text-gray-700 leading-relaxed">
+              <div className="relative">
+                <div className="absolute -top-3 left-6 w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-bottom-[12px] border-b-[#FF8243]"></div>
+                <div className="bg-white p-6 rounded-2xl border-2 border-[#FF8243] relative shadow-sm">
+                  <p className="font-medium text-[#1E2923]">
+                    "단백질 섭취가 매우 우수합니다. 다만 비타민 부족이 관찰되니
+                    과일 섭취를 늘려보세요."
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <h4 className="font-bold text-[#FF8243]">개선 포인트</h4>
+                <ul className="list-disc ml-5 space-y-2 text-sm text-gray-600">
+                  <li>정제 탄수화물(흰 쌀밥) 대신 잡곡밥 선택</li>
+                  <li>하루 물 2L 섭취 루틴 유지하기</li>
+                  <li>취침 3시간 전 금식 실천</li>
+                </ul>
+              </div>
+              <div className="pt-6 border-t border-gray-100">
+                <h4 className="font-bold text-[#FF8243] mb-4">
+                  추천 식단 구성
+                </h4>
+                <div className="space-y-3">
+                  {['아침', '점심', '저녁'].map((meal) => (
+                    <div
+                      key={meal}
+                      className="bg-orange-50 p-4 rounded-lg text-sm border border-orange-100"
+                    >
+                      <strong>{meal}:</strong> 훈제연어 스테이크
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
+
+      <div className="items-center justify-center mx-auto flex mb-4 mt-4">
         <button
-          className="bg-[#1E2923] text-white px-6 py-4 rounded-lg font-medium hover:bg-black transition-colors"
-          onClick={() => {
-            window.print();
-          }}
+          onClick={handleDownloadPdf}
+          className="bg-[#FF8243] text-white px-6 py-3 rounded-lg font-bold hover:bg-[#ff8243c9] transition-all shadow-lg active:scale-95"
         >
           PDF로 저장
         </button>
-      </div>
-
-      {/* 그리드 레이아웃 */}
-      <div className="grid grid-cols-24 gap-4">
-        {/* 왼쪽 & 중앙 차트 영역 */}
-        <div className="col-span-16 grid grid-cols-10 gap-4">
-          {' '}
-          {/* 내부 그리드를 10칸으로 분할 */}
-          {/* 1. 영양 밸런스 (크기 축소: 4칸 차지) */}
-          <div className="col-span-4 bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-            <h3 className="font-bold mb-4">영양 밸런스</h3>
-            {/* 차트의 높이도 살짝 줄이고 싶다면 RadarChart 컴포넌트 내부의 height를 조절하세요 */}
-            <NutrientRadarChart data={radarData} />
-          </div>
-          {/* 2. 목표 달성률 (크기 확대: 6칸 차지) */}
-          <div className="col-span-6 bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-            <h3 className="font-bold mb-4">목표 달성률</h3>
-            <GoalBarChart data={barData} />
-          </div>
-          {/* 3. 7일간 변화 추이 (전체 너비 유지) */}
-          <div className="col-span-10 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h3 className="font-bold mb-4">7일간 변화 추이</h3>
-            <WeeklyLineChart data={lineData} />
-          </div>
-        </div>
-
-        {/* 우측 AI 리뷰 영역 */}
-        <div className="col-span-8 bg-white p-8 rounded-xl shadow-sm border border-gray-100 flex flex-col">
-          <h3 className="font-bold text-xl mb-6 flex items-center">
-            <span className="mr-2">✨</span> AI의 리뷰
-          </h3>
-          <div className="flex-1 space-y-4 text-gray-700 leading-relaxed">
-            <p className="bg-[#F2F9F5] p-4 rounded-lg border-l-4 border-[#FF8243]">
-              "이번 주 단백질 섭취량이 목표 대비 15% 상승했습니다! 아주 좋은
-              흐름이에요."
-            </p>
-            <p>
-              전체적으로 탄단지 비율이 안정적이지만, 목요일에 나트륨 섭취가 다소
-              높았습니다. 주말에는 가벼운 채소 위주의 식단을 추천드려요.
-            </p>
-            <div className="pt-5 border-t border-gray-100">
-              <h4 className="font-bold text-[#FF8243] mb-3">추천 개선안</h4>
-              <ul className="list-disc ml-5 space-y-2 text-sm">
-                <li>오전 공복에 미지근한 물 한 잔</li> {/* 조언 1 */}
-                <li>오후 간식으로 견과류 20g 섭취</li> {/* 조언 2 */}
-                <li>저녁 식사 시 식이섬유 먼저 먹기</li> {/* 조언 3 */}
-              </ul>
-            </div>
-            <div className="pt-5 border-t border-gray-100">
-              <h4 className="font-bold text-[#FF8243] mb-3"> 추천 식단</h4>
-              <ul className="list-disc ml-5 text-sm">
-                <div className="flex flex-col">
-                  <div className="bg-white border-[#FF8243] rounded-lg p-12 mb-5">
-                    카드
-                  </div>
-                  <div className="bg-white border-[#FF8243] rounded-lg p-12 mb-5">
-                    카드
-                  </div>
-                </div>
-              </ul>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

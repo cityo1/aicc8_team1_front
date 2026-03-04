@@ -18,7 +18,7 @@ import {
   Line,
 } from 'recharts';
 
-// 1. 방사형 차트a
+// 1. 방사형 차트
 export const NutrientRadarChart = ({ data }) => (
   <ResponsiveContainer width="100%" height={300}>
     <RadarChart
@@ -72,14 +72,7 @@ export const WeeklyLineChart = ({ data }) => (
       <YAxis />
       <Tooltip />
       <Legend />
-      <Line
-        type="monotone"
-        dataKey="kcal"
-        stroke="#FF8243"
-        strokeWidth={3}
-        dot={{ r: 6 }}
-        activeDot={{ r: 8 }}
-      />
+      <Line type="monotone" dataKey="kcal" stroke="#FF8243" strokeWidth={3} />
       <Line
         type="monotone"
         dataKey="carbohydrate"
