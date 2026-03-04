@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { toPng } from 'html-to-image'; // html2canvas 대신 사용
+import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import {
   NutrientRadarChart,
@@ -98,26 +98,21 @@ const ReportPage = () => {
   // PDF 저장 함수
   const handleDownloadPdf = async () => {
     if (reportRef.current === null) return;
-
     try {
       const dataUrl = await toPng(reportRef.current, {
         cacheBust: true,
         backgroundColor: '#ffffff',
         pixelRatio: 3,
       });
-
       const pdf = new jsPDF('l', 'mm', 'a4');
       const imgProps = pdf.getImageProperties(dataUrl);
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-
-      const scale = 1; //배율
+      const scale = 1;
       const imgWidth = pageWidth * scale;
       const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-
       const marginLeft = (pageWidth - imgWidth) / 2;
       const marginTop = (pageHeight - imgHeight) / 2;
-
       pdf.addImage(dataUrl, 'PNG', marginLeft, marginTop, imgWidth, imgHeight);
       pdf.save(`영양리포트_${new Date().toISOString().slice(0, 10)}.pdf`);
     } catch (err) {
@@ -128,58 +123,68 @@ const ReportPage = () => {
 
   return (
     <div className="p-2 min-h-screen">
-      {/* PDF 변환 대상 영역 */}
       <div
         ref={reportRef}
         className=" bg-[#F2F9F5] text-[#1E2923] w-full mx-auto rounded-2xl border border-gray-100 p-6"
       >
-        {/* 그리드 레이아웃 */}
         <div className="grid grid-cols-24 gap-6">
-          {/* 좌측 영역: 영양 점수 + 차트들 */}
           <div className="col-span-16 flex flex-col gap-6">
-            {/* 상단 요약 카드 (영양 점수) - 위치 이동됨 */}
+            {/* 상단 요약 카드 */}
             <div className="bg-white flex justify-between items-center p-6 rounded-xl shadow-sm border-l-8 border-[#FF8243]">
-              <h2 className="font-semibold text-gray-700 text-lg">
-                홍길동 님의 영양 점수는{' '}
-                <span className="text-[#FF8243] font-extrabold text-2xl">
+              <h2 className="font-semibold text-gray-700 text-lg flex-shrink-0 mr-4">
+                <span className="text-gray-900 font-bold">홍길동</span> 님의
+                영양 점수는{' '}
+                <span className="text-[#FF8243] font-bold text-[22px]">
                   85점
                 </span>{' '}
                 입니다.
               </h2>
 
-              <div className="flex items-center gap-2.5 text-sm">
-                <div className="mr-2.5">
-                  <span className="mr-0.5">지난 주 대비 </span>
-                  <span className="text-gray-600 font-semibold text-[15px] mr-3">
-                    - 10.30점
+              {/* 대비 섹션: 같은 줄 유지 */}
+              <div className="flex items-center gap-3 flex-shrink-0">
+                {/* 지난 주 대비 */}
+                <div className="flex items-center whitespace-nowrap gap-2">
+                  <span className="text-gray-500 text-sm flex-shrink-0">
+                    지난 주 대비
                   </span>
-                  <span className="text-sky-400 font-semibold mr-3">
-                    ▼ 4.0%
-                  </span>
+                  <div className="flex items-center gap-1.5 min-w-[100px]">
+                    <span className="text-gray-700 font-bold text-[15px]">
+                      - <span>10.30</span>점
+                    </span>
+                    <span className="text-sky-400 font-bold text-[15px]">
+                      ▼ <span>4.0</span>%
+                    </span>
+                  </div>
                 </div>
-                <div className="mr-2.5">
-                  <span className="mr-0.5">지난 달 대비 </span>
-                  <span className="text-gray-600 font-semibold text-[15px] mr-3">
-                    + 3.21점
+
+                {/* 구분선 */}
+                <div className="w-[2px] h-7 bg-gray-200"></div>
+
+                {/* 지난 달 대비 */}
+                <div className="flex items-center whitespace-nowrap gap-2">
+                  <span className="text-gray-500 text-sm flex-shrink-0">
+                    지난 달 대비
                   </span>
-                  <span className="text-emerald-500 font-semibold mr-3">
-                    ▲ 5.2%
-                  </span>
+                  <div className="flex items-center gap-1.5 min-w-[100px]">
+                    <span className="text-gray-700 font-bold text-[15px]">
+                      + <span>5.21</span>점
+                    </span>
+                    <span className="text-emerald-500 font-bold text-[15px]">
+                      ▲ <span>9.8</span>%
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* 영양 밸런스, 목표 달성률 */}
             <div className="grid grid-cols-10 gap-6">
-              {/* 영양 밸런스 */}
               <div className="col-span-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <h3 className="font-bold mb-6 text-gray-800 border-b pb-2">
                   영양 밸런스
                 </h3>
                 <NutrientRadarChart data={radarData} />
               </div>
-
-              {/* 목표 달성률 */}
               <div className="col-span-6 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <h3 className="font-bold mb-6 text-gray-800 border-b pb-2">
                   목표 달성률
@@ -215,7 +220,6 @@ const ReportPage = () => {
                   </p>
                 </div>
               </div>
-
               <div className="space-y-4">
                 <h4 className="font-bold text-[#FF8243]">개선 포인트</h4>
                 <ul className="list-disc ml-5 space-y-2 text-sm text-gray-600">
@@ -224,21 +228,19 @@ const ReportPage = () => {
                   <li>취침 3시간 전 금식 실천</li>
                 </ul>
               </div>
-
               <div className="pt-6 border-t border-gray-100">
                 <h4 className="font-bold text-[#FF8243] mb-4">
                   추천 식단 구성
                 </h4>
                 <div className="space-y-3">
-                  <div className="bg-orange-50 p-4 rounded-lg text-sm border border-orange-100">
-                    <strong>아침:</strong> 훈제연어 스테이크
-                  </div>
-                  <div className="bg-orange-50 p-4 rounded-lg text-sm border border-orange-100">
-                    <strong>점심:</strong> 훈제연어 스테이크
-                  </div>
-                  <div className="bg-orange-50 p-4 rounded-lg text-sm border border-orange-100">
-                    <strong>저녁:</strong> 훈제연어 스테이크
-                  </div>
+                  {['아침', '점심', '저녁'].map((meal) => (
+                    <div
+                      key={meal}
+                      className="bg-orange-50 p-4 rounded-lg text-sm border border-orange-100"
+                    >
+                      <strong>{meal}:</strong> 훈제연어 스테이크
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -246,7 +248,6 @@ const ReportPage = () => {
         </div>
       </div>
 
-      {/* PDF 저장 버튼 */}
       <div className="items-center justify-center mx-auto flex mb-4 mt-4">
         <button
           onClick={handleDownloadPdf}
