@@ -203,11 +203,12 @@ export default function LoginPage() {
 
                         <Divider sx={{ mb: 2.5 }}>
                             <Typography variant="body2" color="text.secondary" sx={{ px: 1 }}>
-                                또는 소셜 로그인
+                                또는
                             </Typography>
                         </Divider>
 
-                        <Box sx={{ display: 'flex', gap: 1.5, mb: 3 }}>
+                        {/* 잠시 보류 (후순위) */}
+                        {/* <Box sx={{ display: 'flex', gap: 1.5, mb: 3 }}>
                             <Button
                                 fullWidth
                                 variant="outlined"
@@ -232,7 +233,7 @@ export default function LoginPage() {
                             >
                                 GitHub
                             </Button>
-                        </Box>
+                        </Box> */}
 
                         <Typography variant="body2" color="text.secondary" textAlign="center">
                             계정이 없으신가요?{' '}
