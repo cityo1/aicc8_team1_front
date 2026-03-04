@@ -251,7 +251,7 @@ const ReportPage = () => {
       <div className="items-center justify-center mx-auto flex mb-4 mt-4">
         <button
           onClick={handleDownloadPdf}
-          className="bg-[#1E2923] text-white px-6 py-3 rounded-lg font-bold hover:bg-black transition-all shadow-lg active:scale-95"
+          className="bg-[#FF8243] text-white px-6 py-3 rounded-lg font-bold hover:bg-[#ff8243c9] transition-all shadow-lg active:scale-95"
         >
           PDF로 저장
         </button>
