@@ -12,6 +12,7 @@ import {
     DinnerDining, Icecream, LocalFireDepartment, Add,
     ArrowBack, CheckCircle, EditNote, DeleteOutline,
 } from '@mui/icons-material';
+import FoodSearchInput from '../components/FoodSearchInput';
 
 // ─── Mock Data ──────────────────────────────────────────────────────────────
 const MOCK_DATA = {
@@ -102,7 +103,7 @@ function NutrientBar({ label, value, daily, color }) {
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.4 }}>
                 <Typography variant="caption" color="text.secondary" fontWeight={500}>{label}</Typography>
                 <Typography variant="caption" fontWeight={700} sx={{ color }}>
-                    {value}g <Typography component="span" variant="caption" color="text.disabled">/ {daily}g</Typography>
+                    {Number(value).toFixed(2)}g <Typography component="span" variant="caption" color="text.disabled">/ {daily}g</Typography>
                 </Typography>
             </Box>
             <LinearProgress
@@ -339,9 +340,13 @@ function MealCard({ meal, data, isToday, dateStr }) {
 }
 
 // ─── 기록 추가 카드 ───────────────────────────────────────────────────────────
-const EMPTY_FOOD = () => ({ name: '', calories: '' });
+const EMPTY_FOOD = () => ({
+    name: '',
+    calories: '',
+    nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 }
+});
 
-function AddRecordCard() {
+function AddRecordCard({ onSave }) {
     const [open, setOpen] = useState(false);
     const [selectedMeal, setSelectedMeal] = useState('breakfast');
     const [foods, setFoods] = useState([EMPTY_FOOD()]);
@@ -351,6 +356,22 @@ function AddRecordCard() {
 
     const handleFoodChange = (index, field, value) => {
         setFoods((prev) => prev.map((f, i) => (i === index ? { ...f, [field]: value } : f)));
+    };
+
+    // 음식 검색에서 선택 시 이름, 칼로리, 영양소 동시 업데이트
+    const handleFoodSelect = (index, name, calories, nutrients = null) => {
+        setFoods((prev) =>
+            prev.map((f, i) =>
+                i === index
+                    ? {
+                        ...f,
+                        name,
+                        calories: calories !== '' ? String(calories) : f.calories,
+                        nutrients: nutrients || f.nutrients,
+                    }
+                    : f
+            )
+        );
     };
 
     const handleAddRow = () => setFoods((prev) => [...prev, EMPTY_FOOD()]);
@@ -367,9 +388,15 @@ function AddRecordCard() {
     const handleSubmit = () => {
         const validFoods = foods.filter((f) => f.name.trim());
         if (!validFoods.length) return;
-        // API 연동 위치
-        const summary = validFoods.map((f) => `${f.name}(${f.calories || 0}kcal)`).join(', ');
-        alert(`[${selectedMealInfo?.label}] 저장:\n${summary}\n합계: ${totalCalories}kcal`);
+
+        // 부모 컴포넌트에 음식 데이터 전달 (영양소 포함)
+        const foodsToSave = validFoods.map((f) => ({
+            name: f.name,
+            calories: Number(f.calories) || 0,
+            nutrients: f.nutrients || { carbs: 0, protein: 0, fat: 0, sugar: 0 },
+        }));
+        onSave(selectedMeal, foodsToSave);
+
         setFoods([EMPTY_FOOD()]);
         setOpen(false);
     };
@@ -465,17 +492,10 @@ function AddRecordCard() {
                                             {index + 1}
                                         </Typography>
 
-                                        {/* 음식 이름 */}
-                                        <TextField
-                                            size="small"
-                                            placeholder="음식 이름"
+                                        {/* 음식 이름 (검색 자동완성) */}
+                                        <FoodSearchInput
                                             value={food.name}
-                                            onChange={(e) => handleFoodChange(index, 'name', e.target.value)}
-                                            sx={{
-                                                flexGrow: 1,
-                                                '& .MuiOutlinedInput-root': { borderRadius: 1.5, bgcolor: '#fff', fontSize: '0.875rem' },
-                                                '& .MuiOutlinedInput-notchedOutline': { borderColor: '#e8ecf0' },
-                                            }}
+                                            onChange={(name, calories, nutrients) => handleFoodSelect(index, name, calories, nutrients)}
                                         />
 
                                         {/* 칼로리 */}
@@ -751,6 +771,7 @@ export default function DailyLogPage() {
     const today = new Date();
     const [selectedDate, setSelectedDate] = useState(today);
     const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+    const [mealData, setMealData] = useState(MOCK_DATA);
 
     const handleMonthChange = (delta) => {
         setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
@@ -761,8 +782,67 @@ export default function DailyLogPage() {
         setCurrentMonth(new Date(date.getFullYear(), date.getMonth(), 1));
     };
 
+    // 음식 추가 핸들러
+    const handleAddFood = (mealKey, foods) => {
+        const dateStr = formatDate(selectedDate);
+
+        setMealData((prev) => {
+            const existingDayData = prev[dateStr] || {
+                summary: { calories: 0, carbs: 0, protein: 0, fat: 0, sugar: 0 },
+                breakfast: { foods: [], nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 }, memo: '' },
+                lunch: { foods: [], nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 }, memo: '' },
+                dinner: { foods: [], nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 }, memo: '' },
+                snack: { foods: [], nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 }, memo: '' },
+            };
+
+            const existingMeal = existingDayData[mealKey] || { foods: [], nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 }, memo: '' };
+            const updatedFoods = [...(existingMeal.foods || []), ...foods];
+
+            // 새로 추가되는 음식들의 영양소 합계 계산
+            const newNutrients = foods.reduce(
+                (acc, f) => ({
+                    carbs: acc.carbs + (f.nutrients?.carbs || 0),
+                    protein: acc.protein + (f.nutrients?.protein || 0),
+                    fat: acc.fat + (f.nutrients?.fat || 0),
+                    sugar: acc.sugar + (f.nutrients?.sugar || 0),
+                }),
+                { carbs: 0, protein: 0, fat: 0, sugar: 0 }
+            );
+
+            // 기존 영양소에 새 영양소 합산
+            const updatedNutrients = {
+                carbs: (existingMeal.nutrients?.carbs || 0) + newNutrients.carbs,
+                protein: (existingMeal.nutrients?.protein || 0) + newNutrients.protein,
+                fat: (existingMeal.nutrients?.fat || 0) + newNutrients.fat,
+                sugar: (existingMeal.nutrients?.sugar || 0) + newNutrients.sugar,
+            };
+
+            const newCalories = foods.reduce((sum, f) => sum + f.calories, 0);
+
+            return {
+                ...prev,
+                [dateStr]: {
+                    ...existingDayData,
+                    [mealKey]: {
+                        ...existingMeal,
+                        foods: updatedFoods,
+                        nutrients: updatedNutrients,
+                    },
+                    summary: {
+                        ...existingDayData.summary,
+                        calories: (existingDayData.summary?.calories || 0) + newCalories,
+                        carbs: (existingDayData.summary?.carbs || 0) + newNutrients.carbs,
+                        protein: (existingDayData.summary?.protein || 0) + newNutrients.protein,
+                        fat: (existingDayData.summary?.fat || 0) + newNutrients.fat,
+                        sugar: (existingDayData.summary?.sugar || 0) + newNutrients.sugar,
+                    },
+                },
+            };
+        });
+    };
+
     const dateStr = formatDate(selectedDate);
-    const dayData = MOCK_DATA[dateStr] || null;
+    const dayData = mealData[dateStr] || null;
     const isToday = isSameDay(selectedDate, today);
 
     const totalCalories = dayData
@@ -886,7 +966,7 @@ export default function DailyLogPage() {
                         <Box sx={{ display: 'flex', gap: 2, mt: 1.5 }}>
                             <Box sx={{ width: 20, flexShrink: 0 }} />
                             <Box sx={{ flexGrow: 1 }}>
-                                <AddRecordCard />
+                                <AddRecordCard onSave={handleAddFood} />
                             </Box>
                         </Box>
                     </Stack>
