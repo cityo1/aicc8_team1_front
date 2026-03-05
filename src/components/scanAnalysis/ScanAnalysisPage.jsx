@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Camera,
   ChevronRight,
@@ -21,8 +21,35 @@ const App = () => {
   const [isReanalyzing, setIsReanalyzing] = useState(false); // AI 재분석 로딩
   const [error, setError] = useState(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [imageRect, setImageRect] = useState(null); // { left, top, width, height } px, 컨테이너 기준
   const fileInputRef = useRef(null);
+  const imgContainerRef = useRef(null);
+  const imgRef = useRef(null);
   const navigate = useNavigate();
+
+  const measureImage = useCallback(() => {
+    if (!imgContainerRef.current || !imgRef.current || step !== 'result') return;
+    const containerRect = imgContainerRef.current.getBoundingClientRect();
+    const imgElRect = imgRef.current.getBoundingClientRect();
+    setImageRect({
+      left: imgElRect.left - containerRect.left,
+      top: imgElRect.top - containerRect.top,
+      width: imgElRect.width,
+      height: imgElRect.height,
+    });
+  }, [step]);
+
+  useEffect(() => {
+    if (step !== 'result' || !analysis?.rawFoods?.some((f) => f.bbox)) return;
+    measureImage();
+    const ro = new ResizeObserver(measureImage);
+    if (imgContainerRef.current) ro.observe(imgContainerRef.current);
+    window.addEventListener('resize', measureImage);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measureImage);
+    };
+  }, [step, analysis?.rawFoods, measureImage]);
 
   useEffect(() => {
     if (analysis?.rawFoods?.length) {
@@ -304,36 +331,56 @@ const App = () => {
         {step === 'result' && analysis && (
           <div className="flex items-stretch gap-5 p-1">
             {/* 사진 박스 - 원본 비율 유지, 가로로 넓게 */}
-            <div className="flex-[2.5] min-w-0 rounded-3xl ring-4 ring-orange-50 relative bg-slate-100 flex items-center justify-center">
+            <div
+              ref={imgContainerRef}
+              className="flex-[2.5] min-w-0 rounded-3xl ring-4 ring-orange-50 relative bg-slate-100 flex items-center justify-center overflow-hidden"
+            >
               <img
+                ref={imgRef}
                 src={selectedImage}
                 className="object-contain rounded-3xl w-full h-full"
                 alt="Food"
+                onLoad={measureImage}
               />
-              {/* 추후 추가 예정: 분석한 음식에 박스 영역 표시 */}
-              {/* {analysis.rawFoods?.some((f) => f.bbox) && (
+              {/* 분석한 음식에 박스 영역 표시 - 픽셀 좌표, 이미지 영역 내로 클램프 */}
+              {analysis.rawFoods?.some((f) => f.bbox) && imageRect && (
                 <div className="absolute inset-0 pointer-events-none">
                   {analysis.rawFoods.map(
-                    (food, i) =>
-                      food.bbox && (
+                    (food, i) => {
+                      if (!food.bbox) return null;
+                      const x = (food.bbox.x ?? food.bbox.left ?? 0) / 100;
+                      const y = (food.bbox.y ?? food.bbox.top ?? 0) / 100;
+                      const w = (food.bbox.w ?? food.bbox.width ?? 10) / 100;
+                      const h = (food.bbox.h ?? food.bbox.height ?? 10) / 100;
+                      let left = imageRect.left + x * imageRect.width;
+                      let top = imageRect.top + y * imageRect.height;
+                      let width = w * imageRect.width;
+                      let height = h * imageRect.height;
+                      left = Math.max(imageRect.left, Math.min(left, imageRect.left + imageRect.width - 4));
+                      top = Math.max(imageRect.top, Math.min(top, imageRect.top + imageRect.height - 4));
+                      width = Math.min(width, imageRect.left + imageRect.width - left);
+                      height = Math.min(height, imageRect.top + imageRect.height - top);
+                      if (width < 2 || height < 2) return null;
+                      return (
                         <div
                           key={i}
                           className="absolute border-2 border-yellow-400 bg-yellow-400/20"
                           style={{
-                            left: `${food.bbox.x ?? food.bbox.left ?? 0}%`,
-                            top: `${food.bbox.y ?? food.bbox.top ?? 0}%`,
-                            width: `${food.bbox.w ?? food.bbox.width ?? 10}%`,
-                            height: `${food.bbox.h ?? food.bbox.height ?? 10}%`,
+                            left: `${left}px`,
+                            top: `${top}px`,
+                            width: `${width}px`,
+                            height: `${height}px`,
                           }}
                         >
                           <span className="absolute -top-6 left-0 text-xs font-bold text-yellow-900 bg-yellow-200/95 px-1.5 py-0.5 rounded whitespace-nowrap">
                             {appliedFoods[i]?.name ?? food.name}
                           </span>
                         </div>
-                      ),
+                      );
+                    },
                   )}
                 </div>
-              )} */}
+              )}
             </div>
             {/* 결과 박스 */}
             <div className="flex-[1.5] min-w-0 space-y-5 animate-in fade-in slide-in-from-bottom-6 duration-700">
