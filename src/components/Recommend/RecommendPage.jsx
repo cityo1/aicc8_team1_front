@@ -11,7 +11,8 @@ const openai = new OpenAI({
 });
 
 const RecommendPage = () => {
-  const [recommendedFoods] = useState([
+  // 초기 데이터를 useState로 관리하여 AI 추천 메뉴가 추가/삭제될 수 있도록 함
+  const [recommendedFoods, setRecommendedFoods] = useState([
     {
       id: 1,
       name: '닭가슴살 샐러드',
@@ -22,7 +23,7 @@ const RecommendPage = () => {
     {
       id: 2,
       name: '당근 쿠키',
-      description: '채소',
+      description: '채소로 만든 건강한 디저트',
       tags: ['다이어트', '비건'],
       image: 'https://via.placeholder.com/150',
     },
@@ -33,42 +34,16 @@ const RecommendPage = () => {
       tags: ['고단백'],
       image: 'https://via.placeholder.com/150',
     },
-    {
-      id: 4,
-      name: '김치볶음밥',
-      description: '바삭하지만 가벼운 식물성 간식',
-      tags: ['다이어트'],
-      image: 'https://via.placeholder.com/150',
-    },
-    {
-      id: 5,
-      name: '제로콜라',
-      description: '톡 쏘는 탄산과 0칼로리의 만남',
-      tags: ['0kcal', '다이어트'],
-      image: 'https://via.placeholder.com/150',
-    },
-    {
-      id: 6,
-      name: '보리밥',
-      description: '톡톡 터지는 식감의 건강식',
-      tags: ['다이어트'],
-      image: 'https://via.placeholder.com/150',
-    },
-    {
-      id: 7,
-      name: '망고 샐러드',
-      description: '맛있는 망고 샐러드',
-      tags: ['비건', '다이어트'],
-      image: 'https://via.placeholder.com/150',
-    },
   ]);
 
-  // 검색, 즐겨찾기, 태그 설정
+  // 검색, 즐겨찾기, 태그 설정 상태
   const [searchTerm, setSearchTerm] = useState('');
   const [finalSearchTerm, setFinalSearchTerm] = useState('');
   const [selectedTags, setSelectedTags] = useState([]);
   const [isFavoriteView, setIsFavoriteView] = useState(false);
   const [isDataLoading, setIsDataLoading] = useState(false);
+
+  // 즐겨찾기 로컬스토리지 연동
   const [favorites, setFavorites] = useState(() => {
     const saved = localStorage.getItem('food-favorites');
     return saved ? JSON.parse(saved) : [];
@@ -83,13 +58,17 @@ const RecommendPage = () => {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: '안녕하세요! 식단을 추천해주는 AI 챗봇입니다.',
+      content:
+        '안녕하세요! 식단을 추천해주는 AI 챗봇입니다. 어떤 음식을 추천해 드릴까요?',
     },
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef(null);
 
-  // 챗봇 전송 로직
+  // AI가 사용할 수 있는 태그 목록
+  const filterTags = ['고단백', '다이어트', '비건', '저탄수', '0kcal', '저당'];
+
+  // 챗봇 전송 및 데이터 파싱
   const sendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
 
@@ -100,64 +79,70 @@ const RecommendPage = () => {
 
     try {
       const completion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini', // 모델명
+        model: 'gpt-4o-mini',
         messages: [
           {
-            role: 'assistant',
-            content: `You are a professional nutritionist who recommends meals focusing on balancing the user's nutritional intake and supplementing deficient nutrients. Recommendations must be based on Korean cuisine, as well as international dishes which is popular and universally consumed in korea such as Western, Japanese, Chinese, and processed food products commonly available in Korea.
+            role: 'system',
+            content: `당신은 전문 영양사입니다. 사용자의 요청에 맞춰 한국의 실제 식단을 추천하세요.
 
-            [Strict Restrictions]
-            Do not create non-existent meals or weirdly combine two different dishes. Only recommend real, standard meals that are commonly consumed and available in South Korea.
-            You MUST apply a line break (Press Enter) after every numbered item. Do not present the recommendations as a continuous block of text; each must start on its own new line.
-            Language: All answers must be in Korean. Do not use any English alphabets in your response.
-
-            [General Rules]
-            Priority: If the user specifies a goal (e.g., diet, weight gain, muscle gain, blood sugar management), prioritize it. Otherwise, provide default balanced recommendations.
-            Exclusion: Do not recommend any foods related to mentioned allergies, diseases, or dietary restrictions.
-            Availability: Only recommend foods and products easily found in South Korea.
-            Unit: Recommend 'complete meals' (one-set meals), not just single ingredients.
-            Diversity: Recommend a maximum of two meals of the same category.
-            Nutrients: Each meal must include 1–2 key nutrients and the reason for the recommendation.
-
-            [Output Rules]
-            Response Style: After the first recommendation, if the user provides additional feedback, you should simply provide a brief agree/disagree statement instead of a long list.
-            Line Breaks: Use a numbered list format. You MUST start each item on a NEW LINE (Press Enter). Do not group them into a single paragraph.
-            Quantity: Generate between 6 to 10 items. You do not necessarily need to reach exactly 8; adjust the count as needed.
-            Do not answer any questions or requests that are unrelated to food, nutrition, diets, or health status. - If the user asks something outside of these topics, politely decline and state that you can only provide information related to nutrition and health
-
-            [Response Format]
-            A simple recommendation comment.
-            Number. Food Name: Recommendation Description (Each item must be on a new line)`,
+            [응답 규칙]
+            1. 모든 대화는 한국어로 진행하며 친절하게 설명하세요.
+            2. 모든 대화에서 추천하는 구체적인 메뉴 데이터는 반드시 답변 마지막에 [DATA]와 [/DATA] 태그로 감싸서 JSON 배열 형식으로 포함하세요.
+            3. JSON 구조: [{"name": "음식명", "description": "설명", "tags": ["태그1", "태그2"]}]
+            4. tags는 반드시 다음 목록에서만 선택하세요: ${filterTags.join(', ')}.
+            5. 한 번에 3~5개의 메뉴를 추천하세요.
+            6. 추천된 메뉴는 중복되지 않도록 하세요.
+            7. 없는 식단을 만들어내거나 
+            8. 텍스트 답변에서는 특수문자 *, &, ^, %, $, # ,@를 출력하지 마세요.
+            9. 답변 양식은 아래와 같습니다
+              간단한 설명
+              번호. 추천 메뉴의 이름: 추천 이유`,
           },
           ...messages.filter((m) => m.role !== 'system'),
           userMsg,
         ],
       });
 
-      if (completion.choices && completion.choices[0]) {
-        const aiResponse = completion.choices[0].message.content;
-        setMessages((prev) => [
-          ...prev,
-          { role: 'assistant', content: aiResponse },
-        ]);
-      }
-    } catch (error) {
-      console.error('OpenAI 상세 에러:', error);
+      const fullResponse = completion.choices[0].message.content;
 
-      // 에러 분류
-      let errorMessage = '연결 에러가 발생했습니다.';
-      if (error.message.includes('401'))
-        errorMessage = 'API 키가 유효하지 않습니다.';
-      if (error.message.includes('429'))
-        errorMessage = '할당량이 초과되었습니다 (결제 확인 필요).';
-      if (error.type === 'invalid_request_error')
-        errorMessage = 'CORS 또는 요청 형식 에러입니다.';
+      // 1. 태그 내부의 JSON 데이터만 추출 (정규표현식)
+      const jsonMatch = fullResponse.match(/\[DATA\]([\s\S]*?)\[\/DATA\]/);
+
+      // 2. 채팅창에 표시될 텍스트 답변 (데이터 태그 부분 제거)
+      let chatContent = fullResponse
+        .replace(/\[DATA\]([\s\S]*?)\[\/DATA\]/, '')
+        .trim();
+
+      if (jsonMatch) {
+        try {
+          const rawNewFoods = JSON.parse(jsonMatch[1]);
+          const newFoodsWithId = rawNewFoods.map((food, index) => ({
+            ...food,
+            id: Date.now() + index, // 고유 ID 부여
+            image: 'https://via.placeholder.com/150', // 기본 이미지 설정
+          }));
+
+          // 3. 신규 음식을 리스트 상단에 추가
+          setRecommendedFoods((prev) => [...newFoodsWithId, ...prev]);
+        } catch (error) {
+          console.error('JSON 파싱 실패:', error);
+        }
+      }
 
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content: errorMessage + ' (네트워크나 API 설정을 확인해주세요.)',
+          content: chatContent || '추천 식단을 구성했습니다.',
+        },
+      ]);
+    } catch (error) {
+      console.error('OpenAI 에러:', error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: '연결 에러가 발생했습니다. 잠시 후 다시 시도해주세요.',
         },
       ]);
     } finally {
@@ -170,7 +155,7 @@ const RecommendPage = () => {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, isLoading]);
 
-  // 로딩 트리거 설정
+  // 로딩 트리거 및 필터 핸들러
   const triggerLoading = () => {
     setIsDataLoading(true);
     setTimeout(() => setIsDataLoading(false), 300);
@@ -181,13 +166,10 @@ const RecommendPage = () => {
     setFinalSearchTerm(searchTerm);
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') handleSearch();
-  };
-
-  const handleFavoriteFilterToggle = () => {
-    triggerLoading();
-    setIsFavoriteView(!isFavoriteView);
+  const toggleFavorite = (id) => {
+    setFavorites((prev) =>
+      prev.includes(id) ? prev.filter((favId) => favId !== id) : [...prev, id],
+    );
   };
 
   const handleFilter = (label) => {
@@ -197,12 +179,53 @@ const RecommendPage = () => {
     );
   };
 
-  const toggleFavorite = (id) => {
-    setFavorites((prev) =>
-      prev.includes(id) ? prev.filter((favId) => favId !== id) : [...prev, id],
-    );
+  // 삭제된 데이터를 임시 보관할 Ref (재렌더링 방지)
+  const deletedFoodRef = useRef(null);
+  const toastTimerRef = useRef(null);
+
+  // 삭제 알림
+  const [toast, setToast] = useState({ visible: false, message: '' });
+  const showToast = (message) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ visible: true, message });
+    toastTimerRef.current = setTimeout(() => {
+      setToast({ visible: false, message: '' });
+      deletedFoodRef.current = null;
+    }, 3000);
   };
 
+  // 삭제 핸들러
+  const handleDelete = (id, name) => {
+    const targetIndex = recommendedFoods.findIndex((f) => f.id === id);
+    const targetFood = recommendedFoods[targetIndex];
+    deletedFoodRef.current = { food: targetFood, index: targetIndex };
+    setRecommendedFoods((prevFoods) =>
+      prevFoods.filter((food) => food.id !== id),
+    );
+    setFavorites((prevFoods) => prevFoods.filter((favId) => favId !== id)); // 즐겨찾기 목록에서 해당 id 삭제
+    showToast(`${name}이(가) 삭제되었습니다.`);
+
+    // API 서버 삭제 요청 공간
+  };
+
+  // 삭제 롤백 핸들러
+  const handleUndo = () => {
+    if (deletedFoodRef.current) {
+      const { food, index } = deletedFoodRef.current;
+
+      setRecommendedFoods((prev) => {
+        const newList = [...prev];
+        newList.splice(index, 0, food);
+        return newList;
+      });
+
+      // 토스트 즉시 닫기
+      setToast({ visible: false, message: '' });
+      deletedFoodRef.current = null;
+    }
+  };
+
+  // 필터링된 결과 (상태 기반)
   const displayFoods = recommendedFoods.filter((food) => {
     const matchesSearch = food.name
       .toLowerCase()
@@ -214,10 +237,8 @@ const RecommendPage = () => {
     return matchesSearch && matchesTags && matchesFavorite;
   });
 
-  const filterTags = ['고단백', '다이어트', '비건', '저탄수', '0kcal', '저당'];
-
   return (
-    <div className="flex p-4 gap-4 text-[#1E2923] bg-gray-50 h-[92vh] max-h-[800px] overflow-hidden">
+    <div className="flex p-4 gap-4 text-[#1E2923] bg-gray-50 h-[92vh] max-h-[1000px] overflow-hidden">
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
@@ -225,7 +246,7 @@ const RecommendPage = () => {
       `}</style>
 
       {/* 좌측: AI 챗봇 영역 */}
-      <div className="flex-1 bg-white rounded-2xl border border-gray-100 flex flex-col overflow-hidden shadow-sm">
+      <div className="flex-1 bg-white rounded-2xl border border-gray-100 flex flex-col overflow-hidden shadow-sm mt-1 mb-1">
         <div className="p-4 border-b border-gray-100 bg-white shrink-0">
           <h2 className="font-bold flex items-center gap-2">
             <TbMessageChatbot size={24} color="#FF8243" />
@@ -242,7 +263,7 @@ const RecommendPage = () => {
               className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
             >
               <div
-                className={`p-3 px-4 rounded-2xl shadow-sm max-w-[75%] text-sm ${
+                className={`p-3 px-4 rounded-2xl shadow-sm max-w-[85%] text-sm whitespace-pre-wrap ${
                   msg.role === 'user'
                     ? 'bg-[#FF8243] text-white rounded-tr-none'
                     : 'bg-white text-[#1E2923] border border-gray-100 rounded-tl-none'
@@ -271,7 +292,7 @@ const RecommendPage = () => {
             <button
               onClick={sendMessage}
               disabled={isLoading}
-              className="bg-[#FF8243] text-white px-4 rounded-xl text-sm font-medium disabled:bg-gray-300"
+              className="bg-[#FF8243] text-white px-5 rounded-xl text-sm font-medium disabled:bg-gray-300"
             >
               전송
             </button>
@@ -280,16 +301,16 @@ const RecommendPage = () => {
       </div>
 
       {/* 우측: 검색 및 음식 카드 영역 */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="shrink-0 space-y-2 mb-2">
-          <div className="flex gap-2 mt-1 ml-1 items-center">
+      <div className="flex-1 flex flex-col overflow-hidden relative">
+        <div className="shrink-0 space-y-2 mt-1 mb-1 px-1">
+          <div className="flex gap-2 items-center">
             <div className="flex-1 relative">
               <input
                 type="text"
                 placeholder="식단 검색 ..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyDown={handleKeyDown}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                 className="w-full p-2.5 pl-4 bg-white rounded-xl shadow-sm border border-gray-100 text-sm focus:outline-none focus:ring-1 focus:ring-[#FF8243]"
               />
               <FaSearch
@@ -298,8 +319,11 @@ const RecommendPage = () => {
               />
             </div>
             <button
-              onClick={handleFavoriteFilterToggle}
-              className="p-2.5 mr-1 bg-white border border-gray-100 rounded-xl shadow-sm transition-all duration-200 active:scale-95 flex items-center justify-center hover:bg-gray-50"
+              onClick={() => {
+                triggerLoading();
+                setIsFavoriteView(!isFavoriteView);
+              }}
+              className="p-2.5 bg-white border border-gray-200 rounded-xl shadow-sm transition-all hover:bg-gray-50"
             >
               <FaStar
                 size={18}
@@ -312,7 +336,11 @@ const RecommendPage = () => {
               <button
                 key={label}
                 onClick={() => handleFilter(label)}
-                className={`whitespace-nowrap px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${selectedTags.includes(label) ? 'bg-[#FF8243] text-white border-[#FF8243]' : 'bg-white text-gray-600 border-gray-200'}`}
+                className={`whitespace-nowrap px-3 py-1.5 rounded-full border text-[14px] font-medium transition-all ${
+                  selectedTags.includes(label)
+                    ? 'bg-[#FF8243] text-white border-[#FF8243]'
+                    : 'bg-white text-gray-600 border-gray-200'
+                }`}
               >
                 #{label}
               </button>
@@ -333,16 +361,13 @@ const RecommendPage = () => {
                   food={food}
                   isFavorite={favorites.includes(food.id)}
                   onToggleFavorite={() => toggleFavorite(food.id)}
+                  onDelete={() => handleDelete(food.id, food.name)}
                 />
               ))}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-20 text-gray-400 bg-white rounded-2xl border border-dashed border-gray-200">
-              <p className="text-sm font-medium">
-                {isFavoriteView
-                  ? '즐겨찾기한 식단이 없습니다.'
-                  : '검색 결과가 없습니다.'}
-              </p>
+              <p className="text-sm">해당하는 식단이 없습니다.</p>
               <button
                 onClick={() => {
                   triggerLoading();
@@ -358,6 +383,28 @@ const RecommendPage = () => {
             </div>
           )}
         </div>
+        {toast.visible && (
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 animate-toast-bottom">
+            <div className="bg-[#1E2923]/85 backdrop-blur-sm text-white px-5 py-3 rounded-2xl flex items-center gap-4 border border-white/10 min-w-[400px] justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 bg-[#FF8243] rounded-full"></div>
+                <span className="text-sm font-medium pl-1">
+                  {toast.message}
+                </span>
+              </div>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleUndo();
+                }}
+                className="text-[#FF8243] text-sm font-bold hover:text-[#ff9d6a] border-l border-gray-600 pl-4"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
