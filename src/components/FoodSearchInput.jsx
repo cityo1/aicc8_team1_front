@@ -84,12 +84,13 @@ export default function FoodSearchInput({ value, onChange, sx }) {
     // 검색 결과 선택 핸들러
     const handleSelect = (food) => {
         setInputValue(food.food_name);
-        // 영양소 정보도 함께 전달
+        // 영양소 정보와 food_code도 함께 전달
         onChange(food.food_name, food.calories, {
             carbs: Number(food.carbohydrate) || 0,
             protein: Number(food.protein) || 0,
             fat: Number(food.fat) || 0,
             sugar: Number(food.sugars) || 0,
+            foodCode: food.food_code,
         });
         setShowDropdown(false);
         setSearchResults([]);
