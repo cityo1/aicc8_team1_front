@@ -19,3 +19,21 @@ export async function analyzeFoodImage(file) {
   if (!res.ok) throw new Error(data.message ?? `요청 실패 (${res.status})`);
   return data;
 }
+
+/**
+ * 수정된 음식량으로 AI 재분석 (비율 곱 대신 AI가 새 영양정보 산출)
+ * @param {Array<{ name: string, amount: number }>} foods - 사용자가 수정한 음식 목록
+ * @returns {Promise<{ success: boolean, foods: Array, totalCalories: number }>}
+ */
+export async function reanalyzeFood(foods) {
+  const res = await fetch(`${BASE_URL}/api/scan/food/reanalyze`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ foods }),
+    credentials: 'include',
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message ?? `요청 실패 (${res.status})`);
+  return data;
+}
