@@ -105,6 +105,18 @@ const DIET_OPTIONS = [
 
 const AGE_OPTIONS = ['10대', '20대', '30대', '40대', '50대 이상'];
 
+// ─── TextField Focus 스타일 ─────────────────────────────────────────────────
+const textFieldFocusStyle = {
+    '& .MuiOutlinedInput-root': {
+        '&.Mui-focused fieldset': {
+            borderColor: '#FF8243',
+        },
+    },
+    '& .MuiInputLabel-root.Mui-focused': {
+        color: '#FF8243',
+    },
+};
+
 // ─── 체크박스 그리드 ─────────────────────────────────────────────────────────
 function CheckboxGrid({ options, selected, onChange }) {
     const toggle = (key) => {
@@ -298,12 +310,12 @@ export default function RegisterPage() {
                             <TextField
                                 fullWidth label="이름" name="name" value={form.name} onChange={handleChange} placeholder="홍길동"
                                 InputProps={{ startAdornment: <InputAdornment position="start"><PersonOutlined sx={{ color: 'text.secondary', fontSize: 20 }} /></InputAdornment> }}
-                                sx={{ mb: 2.5 }}
+                                sx={{ mb: 2.5, ...textFieldFocusStyle }}
                             />
                             <TextField
                                 fullWidth label="이메일" name="email" type="email" value={form.email} onChange={handleChange} placeholder="example@email.com"
                                 InputProps={{ startAdornment: <InputAdornment position="start"><EmailOutlined sx={{ color: 'text.secondary', fontSize: 20 }} /></InputAdornment> }}
-                                sx={{ mb: 3 }}
+                                sx={{ mb: 3, ...textFieldFocusStyle }}
                             />
                             <Button fullWidth variant="contained" size="large" onClick={handleNextStep0} sx={{ py: 1.5, bgcolor: '#FF8243', '&:hover': { bgcolor: '#E05A1F' } }}>
                                 다음 단계
@@ -320,7 +332,7 @@ export default function RegisterPage() {
                                     startAdornment: <InputAdornment position="start"><LockOutlined sx={{ color: 'text.secondary', fontSize: 20 }} /></InputAdornment>,
                                     endAdornment: <InputAdornment position="end"><IconButton onClick={() => setShowPassword((v) => !v)} edge="end" size="small">{showPassword ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment>,
                                 }}
-                                sx={{ mb: 0.5 }}
+                                sx={{ mb: 0.5, ...textFieldFocusStyle }}
                             />
                             <PasswordStrength password={form.password} />
 
@@ -336,7 +348,7 @@ export default function RegisterPage() {
                                     startAdornment: <InputAdornment position="start"><LockOutlined sx={{ color: 'text.secondary', fontSize: 20 }} /></InputAdornment>,
                                     endAdornment: <InputAdornment position="end"><IconButton onClick={() => setShowConfirm((v) => !v)} edge="end" size="small">{showConfirm ? <VisibilityOff /> : <Visibility />}</IconButton></InputAdornment>,
                                 }}
-                                sx={{ mt: 2.5, mb: 3 }}
+                                sx={{ mt: 2.5, mb: 3, ...textFieldFocusStyle }}
                             />
 
                             <Box sx={{ display: 'flex', gap: 1.5 }}>
@@ -359,7 +371,7 @@ export default function RegisterPage() {
                                 onChange={(e) => handleProfileChange('nickname', e.target.value)}
                                 placeholder="앱에서 사용할 이름"
                                 InputProps={{ startAdornment: <InputAdornment position="start"><TagFacesOutlined sx={{ color: 'text.secondary', fontSize: 20 }} /></InputAdornment> }}
-                                sx={{ mb: 3 }}
+                                sx={{ mb: 3, ...textFieldFocusStyle }}
                             />
 
                             {/* 성별 */}
@@ -424,12 +436,14 @@ export default function RegisterPage() {
                                     onChange={(e) => handleProfileChange('height', e.target.value)}
                                     placeholder="170"
                                     InputProps={{ endAdornment: <InputAdornment position="end"><Typography variant="body2" color="text.secondary">cm</Typography></InputAdornment> }}
+                                    sx={{ ...textFieldFocusStyle }}
                                 />
                                 <TextField
                                     fullWidth label="몸무게" type="number" value={profile.weight}
                                     onChange={(e) => handleProfileChange('weight', e.target.value)}
                                     placeholder="65"
                                     InputProps={{ endAdornment: <InputAdornment position="end"><Typography variant="body2" color="text.secondary">kg</Typography></InputAdornment> }}
+                                    sx={{ ...textFieldFocusStyle }}
                                 />
                             </Box>
 
