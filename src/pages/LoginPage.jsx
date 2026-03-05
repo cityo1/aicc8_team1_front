@@ -27,6 +27,18 @@ import {
     GitHub,
 } from '@mui/icons-material';
 
+// ─── TextField Focus 스타일 ─────────────────────────────────────────────────
+const textFieldFocusStyle = {
+    '& .MuiOutlinedInput-root': {
+        '&.Mui-focused fieldset': {
+            borderColor: '#FF8243',
+        },
+    },
+    '& .MuiInputLabel-root.Mui-focused': {
+        color: '#FF8243',
+    },
+};
+
 export default function LoginPage() {
     const navigate = useNavigate();
     const auth = useAuth();
@@ -128,7 +140,7 @@ export default function LoginPage() {
                                     </InputAdornment>
                                 ),
                             }}
-                            sx={{ mb: 2.5 }}
+                            sx={{ mb: 2.5, ...textFieldFocusStyle }}
                         />
 
                         <TextField
@@ -157,7 +169,7 @@ export default function LoginPage() {
                                     </InputAdornment>
                                 ),
                             }}
-                            sx={{ mb: 1 }}
+                            sx={{ mb: 1, ...textFieldFocusStyle }}
                         />
 
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
