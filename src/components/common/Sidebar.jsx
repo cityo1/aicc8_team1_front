@@ -77,7 +77,12 @@ const Sidebar = () => {
 
       <nav className="flex-1 space-y-2 min-h-0 overflow-y-auto">
         {menuItems.map((item) => (
-          <NavLink key={item.path} to={item.path} className={navLinkClass}>
+          <NavLink
+            key={item.path}
+            to={item.path}
+            className={navLinkClass}
+            end={item.path === '/home'}
+          >
             {item.icon}
             <span className="font-medium">{item.label}</span>
           </NavLink>
