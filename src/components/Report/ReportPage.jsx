@@ -1,12 +1,9 @@
 import React, { useRef } from 'react';
 import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
-import {
-  NutrientRadarChart,
-  GoalBarChart,
-  WeeklyLineChart,
-} from './ReportCharts';
+import { NutrientRadarChart, WeeklyLineChart } from './ReportCharts';
 import { PiChefHat } from 'react-icons/pi';
+import FoodCardRecommend from '../Recommend/FoodCardRecommend';
 
 const ReportPage = () => {
   const reportRef = useRef(null);
@@ -18,14 +15,6 @@ const ReportPage = () => {
     { subject: '단백질', value: 90 },
     { subject: '지방', value: 60 },
     { subject: '당류', value: 70 },
-  ];
-
-  const barData = [
-    { name: '칼로리', diff: 5 },
-    { name: '탄수화물', diff: -15 },
-    { name: '단백질', diff: 10 },
-    { name: '지방', diff: 12 },
-    { name: '당류', diff: -15 },
   ];
 
   const lineData = [
@@ -122,7 +111,7 @@ const ReportPage = () => {
         <div className="grid grid-cols-3 gap-6">
           <div className="col-span-2 flex flex-col gap-6">
             {/* 상단 요약 카드 */}
-            <div className="bg-white flex justify-between items-center p-6 rounded-xl shadow-sm border-l-8 border-[#FF8243]">
+            <div className="bg-white flex justify-between items-center p-5 rounded-xl shadow-sm border-l-8 border-[#FF8243]">
               <h2 className="font-semibold text-gray-700 text-lg mr-4">
                 <span className="text-gray-900 font-bold">홍길동</span> 님의
                 주간 영양 점수는{' '}
@@ -136,22 +125,24 @@ const ReportPage = () => {
               <div className="flex items-center gap-3 shrink-0">
                 {/* 지난 주 대비 */}
                 <div className="flex items-center whitespace-nowrap gap-2">
-                  <span className="text-gray-500 text-sm">지난 주 대비</span>
-                  <div className="flex items-center gap-1.5 min-w-[100px]">
-                    <span className="text-gray-700 font-bold text-[15px]">
+                  <span className="text-gray-500 text-sm mr-1">
+                    지난 주 대비
+                  </span>
+                  <div className="flex items-center gap-1.5 min-w-[50px] mr-1">
+                    <span className="text-gray-700 font-bold text-[15px] mr-1">
                       - <span>10.30</span>점
                     </span>
-                    <span className="text-sky-400 font-bold text-[15px]">
+                    <span className="text-sky-400 font-bold text-[15px] mr-1">
                       ▼ <span>4.0</span>%
                     </span>
                   </div>
                 </div>
 
                 {/* 구분선 */}
-                <div className="w-[2px] h-7 bg-gray-200"></div>
+                {/* <div className="w-[2px] h-7 bg-gray-200"></div> */}
 
                 {/* 지난 달 대비 */}
-                <div className="flex items-center whitespace-nowrap gap-2">
+                {/* <div className="flex items-center whitespace-nowrap gap-2">
                   <span className="text-gray-500 text-sm flex-shrink-0">
                     지난 달 대비
                   </span>
@@ -163,23 +154,32 @@ const ReportPage = () => {
                       ▲ <span>9.8</span>%
                     </span>
                   </div>
-                </div>
+                </div> */}
               </div>
             </div>
 
             {/* 영양 밸런스, 목표 달성률 */}
-            <div className="grid grid-cols-7 gap-6">
-              <div className="col-span-3 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <div className="grid grid-cols-2 gap-6">
+              <div className="col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <h3 className="font-bold mb-6 text-gray-800 border-b pb-2">
                   영양 밸런스
                 </h3>
                 <NutrientRadarChart data={radarData} />
               </div>
-              <div className="col-span-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="font-bold mb-6 text-gray-800 border-b pb-2">
-                  목표 달성률
+              <div className="col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <h3 className="font-bold mb-5 text-gray-800 border-b pb-2">
+                  과잉/부족 영양소
                 </h3>
-                <GoalBarChart data={barData} height={300} />
+                <div className="grid grid-rows-2 gap-3">
+                  <div className="row-span-1 flex items-center justify-center">
+                    <h3 className="">과잉 영양소</h3>
+                    <div></div>
+                  </div>
+                  <div className="row-span-1 flex items-center justify-center">
+                    <h3 className="">부족 영양소</h3>
+                    <div></div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -202,7 +202,6 @@ const ReportPage = () => {
             </h3>
             <div className="flex-1 space-y-6 text-gray-700 leading-relaxed">
               <div className="relative">
-                <div className="absolute -top-3 left-6 w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-bottom-[12px] border-b-[#FF8243]"></div>
                 <div className="bg-white p-6 rounded-2xl border-2 border-[#FF8243] relative shadow-sm">
                   <p className="font-medium text-[#1E2923]">
                     "단백질 섭취가 매우 우수합니다. 다만 비타민 부족이 관찰되니
@@ -222,16 +221,7 @@ const ReportPage = () => {
                 <h4 className="font-bold text-[#FF8243] mb-4">
                   추천 식단 구성
                 </h4>
-                <div className="space-y-3">
-                  {['아침', '점심', '저녁'].map((meal) => (
-                    <div
-                      key={meal}
-                      className="bg-orange-50 p-4 rounded-lg text-sm border border-orange-100"
-                    >
-                      <strong>{meal}:</strong> 훈제연어 스테이크
-                    </div>
-                  ))}
-                </div>
+                <div>{/* <FoodCardRecommend food={food} /> */}</div>
               </div>
             </div>
           </div>

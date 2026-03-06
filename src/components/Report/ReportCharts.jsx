@@ -6,21 +6,18 @@ import {
   PolarAngleAxis,
   PolarRadiusAxis,
   ResponsiveContainer,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
-  ReferenceLine,
   LineChart,
   Line,
 } from 'recharts';
 
-// 1. 방사형 차트
+// 방사형 차트
 export const NutrientRadarChart = ({ data }) => (
-  <ResponsiveContainer width="100%" height={300}>
+  <ResponsiveContainer width="100%" height={350}>
     <RadarChart
       cx="50%"
       cy="50%"
@@ -45,25 +42,7 @@ export const NutrientRadarChart = ({ data }) => (
   </ResponsiveContainer>
 );
 
-// 2. 목표 달성률
-export const GoalBarChart = ({ data }) => (
-  <ResponsiveContainer width="100%" height={300}>
-    <BarChart data={data} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-      <CartesianGrid
-        strokeDasharray="3 3"
-        vertical={false}
-        margin={{ bottom: 30 }}
-      />
-      <XAxis dataKey="name" />
-      <YAxis />
-      <Tooltip cursor={{ fill: 'transparent' }} />
-      <ReferenceLine y={0} stroke="#000" />
-      <Bar dataKey="diff" fill="#FF8243" radius={[4, 4, 0, 0]} />
-    </BarChart>
-  </ResponsiveContainer>
-);
-
-// 3. 7일간 변화 추이
+// 7일간 변화 추이
 export const WeeklyLineChart = ({ data }) => (
   <ResponsiveContainer width="100%" height={300}>
     <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
