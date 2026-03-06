@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router-dom';
 import {
   Box,
   Paper,
@@ -170,7 +170,7 @@ function NutrientBar({ label, value, daily, color }) {
 }
 
 // ─── 식사 카드 ────────────────────────────────────────────────────────────────
-function MealCard({ meal, data, isToday, dateStr, scanImage, scanMealType }) {
+function MealCard({ meal, data, isToday, dateStr }) {
   const [open, setOpen] = useState(false);
   const totalCal = getMealTotalCalories(data);
   const { Icon, color, bg, darkColor } = meal;
@@ -260,32 +260,6 @@ function MealCard({ meal, data, isToday, dateStr, scanImage, scanMealType }) {
       <Collapse in={open}>
         <Divider />
         <Box sx={{ p: 2.5 }}>
-          {/* AI 식단분석 기록 이미지 (해당 식사 구분 탭, 음식 목록 바로 위) */}
-          {scanImage && scanMealType === meal.key && (
-            <Box sx={{ mb: 2 }}>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                fontWeight={600}
-                sx={{ display: 'block', mb: 1 }}
-              >
-                AI 식단분석 기록
-              </Typography>
-              <Box
-                component="img"
-                src={scanImage}
-                alt="분석된 식사 사진"
-                sx={{
-                  width: 100,
-                  height: 100,
-                  objectFit: 'cover',
-                  borderRadius: 2,
-                  border: '2px solid #FF8243',
-                  boxShadow: 1,
-                }}
-              />
-            </Box>
-          )}
           {/* 음식 리스트 */}
           <Typography
             variant="body2"
@@ -1306,8 +1280,6 @@ function NutritionSummaryPanel({ date, data }) {
 // ─── 메인 페이지 ──────────────────────────────────────────────────────────────
 export default function DailyLogPage() {
   const { user } = useAuth();
-  const location = useLocation();
-  const navigate = useNavigate();
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState(today);
   const [currentMonth, setCurrentMonth] = useState(
@@ -1315,8 +1287,6 @@ export default function DailyLogPage() {
   );
   const [dayData, setDayData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [scanPreview, setScanPreview] = useState(null); // { image, mealType }
-
   // API에서 날짜별 식사 데이터 불러오기
   const fetchDailyData = async (date, userId) => {
     if (!userId) return;
@@ -1349,33 +1319,6 @@ export default function DailyLogPage() {
     if (user?.id) {
       fetchDailyData(today, user.id);
     }
-  }, [user?.id]);
-
-  // ScanAnalysis에서 기록하기로 넘어온 데이터 처리
-  const scanProcessedRef = useRef(false);
-  useEffect(() => {
-    const s = location.state;
-    if (
-      !s?.fromScan ||
-      !s.mealType ||
-      !s.foods?.length ||
-      scanProcessedRef.current
-    )
-      return;
-    scanProcessedRef.current = true;
-
-    const scanDate = s.date ? new Date(s.date + 'T12:00:00') : today;
-    setSelectedDate(scanDate);
-    setCurrentMonth(new Date(scanDate.getFullYear(), scanDate.getMonth(), 1));
-    if (s.image && s.mealType)
-      setScanPreview({ image: s.image, mealType: s.mealType });
-
-    // ScanAnalysis에서 넘어온 후 해당 날짜 데이터 새로고침
-    if (user?.id) {
-      fetchDailyData(scanDate, user.id);
-    }
-
-    navigate(location.pathname, { replace: true, state: {} });
   }, [user?.id]);
 
   const handleMonthChange = (delta) => {
@@ -1564,8 +1507,6 @@ export default function DailyLogPage() {
                     data={dayData?.[meal.key]}
                     isToday={isToday}
                     dateStr={dateStr}
-                    scanImage={scanPreview?.image}
-                    scanMealType={scanPreview?.mealType}
                   />
                 </Box>
               </Box>
