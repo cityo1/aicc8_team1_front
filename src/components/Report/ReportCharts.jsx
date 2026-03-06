@@ -76,7 +76,7 @@ export const WeeklyLineChart = ({ data }) => (
       <Line
         type="monotone"
         dataKey="carbohydrate"
-        stroke="#ecd100"
+        stroke="#12cee7"
         strokeWidth={2}
       />
       <Line
@@ -87,12 +87,6 @@ export const WeeklyLineChart = ({ data }) => (
       />
       <Line type="monotone" dataKey="fat" stroke="#b115ec" strokeWidth={2} />
       <Line type="monotone" dataKey="sugars" stroke="#0854ed" strokeWidth={2} />
-      <Line
-        type="monotone"
-        dataKey="vitamin"
-        stroke="#12cee7"
-        strokeWidth={2}
-      />
     </LineChart>
   </ResponsiveContainer>
 );

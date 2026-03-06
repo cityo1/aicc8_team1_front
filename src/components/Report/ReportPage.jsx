@@ -13,11 +13,11 @@ const ReportPage = () => {
 
   // 샘플 데이터
   const radarData = [
+    { subject: '칼로리', value: 85 },
     { subject: '탄수화물', value: 80 },
     { subject: '단백질', value: 90 },
     { subject: '지방', value: 60 },
-    { subject: '비타민', value: 70 },
-    { subject: '식이섬유', value: 85 },
+    { subject: '당류', value: 70 },
   ];
 
   const barData = [
@@ -26,7 +26,6 @@ const ReportPage = () => {
     { name: '단백질', diff: 10 },
     { name: '지방', diff: 12 },
     { name: '당류', diff: -15 },
-    { name: '비타민', diff: 7 },
   ];
 
   const lineData = [
@@ -37,7 +36,6 @@ const ReportPage = () => {
       protein: 60,
       fat: 400,
       sugars: 500,
-      vitamin: 50,
     },
     {
       day: '2/26',
@@ -46,7 +44,6 @@ const ReportPage = () => {
       protein: 70,
       fat: 300,
       sugars: 200,
-      vitamin: 1000,
     },
     {
       day: '2/27',
@@ -55,7 +52,6 @@ const ReportPage = () => {
       protein: 65,
       fat: 400,
       sugars: 500,
-      vitamin: 50,
     },
     {
       day: '2/28',
@@ -64,7 +60,6 @@ const ReportPage = () => {
       protein: 80,
       fat: 300,
       sugars: 200,
-      vitamin: 1000,
     },
     {
       day: '3/01',
@@ -73,7 +68,6 @@ const ReportPage = () => {
       protein: 55,
       fat: 400,
       sugars: 500,
-      vitamin: 50,
     },
     {
       day: '3/02',
@@ -82,7 +76,6 @@ const ReportPage = () => {
       protein: 75,
       fat: 300,
       sugars: 200,
-      vitamin: 1000,
     },
     {
       day: '3/03',
@@ -91,7 +84,6 @@ const ReportPage = () => {
       protein: 68,
       fat: 400,
       sugars: 500,
-      vitamin: 50,
     },
   ];
 
@@ -127,11 +119,11 @@ const ReportPage = () => {
         ref={reportRef}
         className=" bg-[#F2F9F5] text-[#1E2923] w-full mx-auto rounded-2xl border border-gray-100 p-6"
       >
-        <div className="grid grid-cols-24 gap-6">
-          <div className="col-span-16 flex flex-col gap-6">
+        <div className="grid grid-cols-3 gap-6">
+          <div className="col-span-2 flex flex-col gap-6">
             {/* 상단 요약 카드 */}
             <div className="bg-white flex justify-between items-center p-6 rounded-xl shadow-sm border-l-8 border-[#FF8243]">
-              <h2 className="font-semibold text-gray-700 text-lg flex-shrink-0 mr-4">
+              <h2 className="font-semibold text-gray-700 text-lg mr-4">
                 <span className="text-gray-900 font-bold">홍길동</span> 님의
                 영양 점수는{' '}
                 <span className="text-[#FF8243] font-bold text-[22px]">
@@ -141,12 +133,10 @@ const ReportPage = () => {
               </h2>
 
               {/* 대비 섹션: 같은 줄 유지 */}
-              <div className="flex items-center gap-3 flex-shrink-0">
+              <div className="flex items-center gap-3 shrink-0">
                 {/* 지난 주 대비 */}
                 <div className="flex items-center whitespace-nowrap gap-2">
-                  <span className="text-gray-500 text-sm flex-shrink-0">
-                    지난 주 대비
-                  </span>
+                  <span className="text-gray-500 text-sm">지난 주 대비</span>
                   <div className="flex items-center gap-1.5 min-w-[100px]">
                     <span className="text-gray-700 font-bold text-[15px]">
                       - <span>10.30</span>점
@@ -178,18 +168,18 @@ const ReportPage = () => {
             </div>
 
             {/* 영양 밸런스, 목표 달성률 */}
-            <div className="grid grid-cols-10 gap-6">
-              <div className="col-span-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <div className="grid grid-cols-7 gap-6">
+              <div className="col-span-3 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <h3 className="font-bold mb-6 text-gray-800 border-b pb-2">
                   영양 밸런스
                 </h3>
                 <NutrientRadarChart data={radarData} />
               </div>
-              <div className="col-span-6 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <div className="col-span-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <h3 className="font-bold mb-6 text-gray-800 border-b pb-2">
                   목표 달성률
                 </h3>
-                <GoalBarChart data={barData} />
+                <GoalBarChart data={barData} height={300} />
               </div>
             </div>
 
@@ -203,7 +193,7 @@ const ReportPage = () => {
           </div>
 
           {/* AI 리뷰 */}
-          <div className="col-span-8 bg-white p-8 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
+          <div className="col-span-1 bg-white p-8 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
             <h3 className="font-bold text-xl mb-6 flex items-center text-gray-800">
               <span className="mr-2">
                 <PiChefHat size={25} color="#FF8243" />
