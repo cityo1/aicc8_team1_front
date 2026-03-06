@@ -6,15 +6,20 @@ import {
   ClipboardList,
   BarChart3,
   Bell,
+  BellOff,
   Settings,
   User,
   LogOut,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useProfile } from '../../contexts/ProfileContext';
+import { useNotification } from '../../contexts/NotificationContext';
 import { authApi } from '../../api/auth';
 
 const Sidebar = () => {
   const { user, isAuthenticated, logout } = useAuth();
+  const { profile } = useProfile();
+  const { notificationEnabled } = useNotification();
   const navigate = useNavigate();
 
   const menuItems = [
@@ -38,7 +43,11 @@ const Sidebar = () => {
   ];
 
   const bottomItems = [
-    { path: '/home/notifications', icon: <Bell size={18} />, label: '알림' },
+    {
+      path: '/home/notifications',
+      icon: notificationEnabled ? <Bell size={18} /> : <BellOff size={18} />,
+      label: notificationEnabled ? '알림' : '알림 꺼짐',
+    },
     { path: '/home/settings', icon: <Settings size={18} />, label: '환경설정' },
   ];
 
@@ -111,7 +120,9 @@ const Sidebar = () => {
               style={{ color: 'var(--color-background)' }}
             >
               <User size={18} />
-              <span className="font-semibold">{user?.nickname || '사용자'}</span>
+              <span className="font-semibold">
+                {profile?.nickname || user?.nickname || '사용자'}
+              </span>
             </div>
             <button
               onClick={handleLogout}

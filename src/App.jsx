@@ -1,9 +1,10 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Layout } from './components/common';
 import { AuthProvider } from './contexts/AuthContext';
+import { ProfileProvider } from './contexts/ProfileContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import LandingPage from './pages/LandingPage';
 import HomePage from './components/home/HomePage';
-import PlaceholderPage from './pages/PlaceholderPage';
 import DailyLogPage from './pages/DailyLogPage';
 import ReportPage from './components/Report/ReportPage';
 import LoginPage from './pages/LoginPage';
@@ -11,12 +12,16 @@ import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ScanAnalysisPage from './components/scanAnalysis/ScanAnalysisPage';
 import RecommendPage from './components/Recommend/RecommendPage';
+import Setting from './components/setting/Setting';
+import Alert from './components/alert/Alert';
 
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
+      <ProfileProvider>
+        <NotificationProvider>
+        <BrowserRouter>
+          <Routes>
           {/* 랜딩 페이지 (첫 진입) */}
           <Route path="/" element={<LandingPage />} />
 
@@ -33,17 +38,13 @@ function App() {
             <Route path="scanAnalysis" element={<ScanAnalysisPage />} />
             <Route path="dailyLog" element={<DailyLogPage />} />
             <Route path="report" element={<ReportPage />} />
-            <Route
-              path="notifications"
-              element={<PlaceholderPage title="알림" />}
-            />
-            <Route
-              path="settings"
-              element={<PlaceholderPage title="환경설정" />}
-            />
+            <Route path="notifications" element={<Alert />} />
+            <Route path="settings" element={<Setting />} />
           </Route>
-        </Routes>
-      </BrowserRouter>
+          </Routes>
+        </BrowserRouter>
+        </NotificationProvider>
+      </ProfileProvider>
     </AuthProvider>
   );
 }
