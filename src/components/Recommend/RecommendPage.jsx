@@ -1,48 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // 페이지 이동용
 import FoodCardRecommend from './FoodCardRecommend';
-import {
-  FaStar,
-  FaSearch,
-  FaRegCheckSquare,
-  FaCheckSquare,
-} from 'react-icons/fa';
+import { FaStar, FaSearch } from 'react-icons/fa';
 import { TbMessageChatbot } from 'react-icons/tb';
 import { IoMdRefresh } from 'react-icons/io';
 import { LuPanelTopOpen } from 'react-icons/lu';
-
-import OpenAI from 'openai';
-
-// 1. OpenAI 설정 (Vite 환경 변수 사용)
-const openai = new OpenAI({
-  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true,
-});
+// 분리한 서비스 임포트
 
 const RecommendPage = () => {
-  // 초기 데이터를 useState로 관리하여 AI 추천 메뉴가 추가/삭제될 수 있도록 함
-  const [recommendedFoods, setRecommendedFoods] = useState([
-    {
-      id: 1,
-      name: '닭가슴살 샐러드',
-      description: '신선한 야채와 저지방 단백질의 조화',
-      tags: ['고단백', '저탄수', '다이어트'],
-      image: 'https://via.placeholder.com/150',
-    },
-    {
-      id: 2,
-      name: '퀴노아 샐러드',
-      description: '채소로 만든 건강한 디저트',
-      tags: ['다이어트', '비건'],
-      image: 'https://via.placeholder.com/150',
-    },
-    {
-      id: 3,
-      name: '훈제연어 스테이크',
-      description: '오메가3가 풍부한 건강한 지방 섭취',
-      tags: ['고단백'],
-      image: 'https://via.placeholder.com/150',
-    },
-  ]);
+  const navigate = useNavigate();
+  const [recommendedFoods, setRecommendedFoods] = useState([]);
 
   // 검색, 즐겨찾기, 태그 설정 상태
   const [searchTerm, setSearchTerm] = useState('');
@@ -58,8 +25,21 @@ const RecommendPage = () => {
   });
 
   useEffect(() => {
-    localStorage.setItem('food-favorites', JSON.stringify(favorites));
-  }, [favorites]);
+    const fetchRandomFoods = async () => {
+      try {
+        const res = await fetch('/api/recommend/random');
+        const data = await res.json();
+        if (data.success) setRecommendedFoods(data.foods);
+      } catch (err) {
+        console.error('초기 로드 실패', err);
+      }
+    };
+    fetchRandomFoods();
+  }, []);
+
+  // useEffect(() => {
+  //   localStorage.setItem('food-favorites', JSON.stringify(favorites));
+  // }, [favorites]);
 
   // AI 챗봇 상태
   const [inputMessage, setInputMessage] = useState('');
@@ -82,99 +62,32 @@ const RecommendPage = () => {
 
     const userMsg = { role: 'user', content: inputMessage };
     setMessages((prev) => [...prev, userMsg]);
+    const currentInput = inputMessage;
     setInputMessage('');
     setIsLoading(true);
 
     try {
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `당신은 전문 영양사입니다. 사용자의 요청에 맞춰 한국의 실제 식단을 추천하세요.
-
-            [응답 규칙]
-            1. 모든 대화는 한국어로 진행하며 친절하게 설명하세요.
-            2. 모든 대화에서 추천하는 구체적인 메뉴 데이터는 반드시 답변 마지막에 [DATA]와 [/DATA] 태그로 감싸서 JSON 배열 형식으로 포함하세요.
-            3. JSON 구조: [{"name": "음식명", "description": "설명", "tags": ["태그1", "태그2"]}]
-            4. tags는 반드시 다음 목록에서만 선택하세요: ${filterTags.join(', ')}.
-            5. 한 번에 3~5개의 메뉴를 추천하세요.
-            6. 추천된 메뉴는 중복되지 않도록 하세요.
-            7. 없는 식단을 만들어내거나 
-            8. 텍스트 답변에서는 특수문자 *, &, ^, %, $, #, @, ;를 출력하지 마세요.
-            9. 답변 양식은 아래와 같습니다
-              간단한 설명
-              번호를 적은 후 추천 메뉴의 이름과 추천 이유를 콜론(:)으로 구분하세요.
-              오른쪽 추천메뉴 카드들 확인 권유`,
-          },
-          ...messages.filter((m) => m.role !== 'system'),
-          userMsg,
-        ],
+      const response = await fetch('/api/recommend/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages, inputMessage: currentInput }),
       });
+      const data = await response.json();
 
-      const fullResponse = completion.choices[0].message.content;
-
-      // 1. 태그 내부의 JSON 데이터만 추출 (정규표현식)
-      const jsonMatch = fullResponse.match(/\[DATA\]([\s\S]*?)\[\/DATA\]/);
-
-      // 2. 채팅창에 표시될 텍스트 답변 (데이터 태그 부분 제거)
-      let chatContent = fullResponse
-        .replace(/\[DATA\]([\s\S]*?)\[\/DATA\]/, '')
-        .trim();
-
-      if (jsonMatch) {
-        try {
-          const rawNewFoods = JSON.parse(jsonMatch[1]);
-
-          setRecommendedFoods((prev) => {
-            let updatedList = [...prev];
-            [...rawNewFoods].reverse().forEach((newFood) => {
-              const newNameClean = newFood.name.replace(/\s+/g, '');
-
-              // 기존 리스트에 같은 이름이 있는지 확인
-              const existingIndex = updatedList.findIndex(
-                (f) => f.name.replace(/\s+/g, '') === newNameClean,
-              );
-
-              if (existingIndex !== -1) {
-                // 이미 있다면 해당 항목을 추출해서 맨 앞으로 이동
-                const [existingItem] = updatedList.splice(existingIndex, 1);
-                updatedList.unshift({
-                  ...existingItem,
-                  description: newFood.description,
-                });
-              } else {
-                // 없다면 새 ID를 부여해서 맨 앞에 추가
-                updatedList.unshift({
-                  ...newFood,
-                  id: Date.now() + Math.random(),
-                  image: 'https://via.placeholder.com/150',
-                });
-              }
-            });
-
-            return updatedList;
-          });
-        } catch (error) {
-          console.error('JSON 파싱 실패:', error);
+      if (data.success) {
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: data.chatContent },
+        ]);
+        // DB에서 온 추천 음식을 리스트 맨 앞에 추가
+        if (data.foods) {
+          setRecommendedFoods((prev) => [...data.foods, ...prev]);
         }
       }
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: chatContent || '추천 식단을 구성했습니다.',
-        },
-      ]);
     } catch (error) {
-      console.error('OpenAI 에러:', error);
       setMessages((prev) => [
         ...prev,
-        {
-          role: 'assistant',
-          content: '연결 에러가 발생했습니다. 잠시 후 다시 시도해주세요.',
-        },
+        { role: 'assistant', content: '에러가 발생했습니다.' },
       ]);
     } finally {
       setIsLoading(false);
@@ -197,10 +110,22 @@ const RecommendPage = () => {
     setFinalSearchTerm(searchTerm);
   };
 
-  const toggleFavorite = (id) => {
+  const toggleFavorite = async (id) => {
+    const isFav = favorites.includes(id);
     setFavorites((prev) =>
-      prev.includes(id) ? prev.filter((favId) => favId !== id) : [...prev, id],
+      isFav ? prev.filter((favId) => favId !== id) : [...prev, id],
     );
+
+    console.log(`음식 ID: ${id}, 현재상태: ${isFav ? '해제' : '등록'}`);
+    // try {
+    //   await fetch('/api/recommend/favorite', {
+    //     method: 'POST',
+    //     headers: { 'Content-Type': 'application/json' },
+    //     body: JSON.stringify({ foodId: id, isFavorite: !isFav }),
+    //   });
+    // } catch (err) {
+    //   console.error('즐겨찾기 저장 실패');
+    // }
   };
 
   const handleFilter = (label) => {
@@ -221,13 +146,9 @@ const RecommendPage = () => {
   const [sortType, setSortType] = useState('latest');
 
   // 체크박스 상태
-  const [checkedItems, setCheckedItems] = useState([]);
-  const toggleCheck = (id) => {
-    setCheckedItems((prev) =>
-      prev.includes(id)
-        ? prev.filter((itemId) => itemId !== id)
-        : [...prev, id],
-    );
+  const handleToggleCheck = (food) => {
+    // food 객체를 상태에 담아 페이지 이동
+    navigate('/dailyLog', { state: { food } });
   };
 
   // 삭제된 데이터를 임시 보관할 Ref (재렌더링 방지)
@@ -448,7 +369,7 @@ const RecommendPage = () => {
                   onToggleFavorite={() => toggleFavorite(food.id)}
                   onDelete={() => handleDelete(food.id, food.name)}
                   isChecked={checkedItems.includes(food.id)} // 체크 상태 전달
-                  onToggleCheck={() => toggleCheck(food.id)} // 토글 함수 전달
+                  onToggleCheck={() => handleToggleCheck(food)}
                 />
               ))}
             </div>
