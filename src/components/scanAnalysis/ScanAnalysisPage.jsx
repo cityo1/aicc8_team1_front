@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { analyzeFoodImage, reanalyzeFood } from '../../api/scan';
+import { saveScanToDiary } from '../../api/diary';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   calculateNutritionScore,
@@ -36,6 +37,7 @@ const App = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [imageRect, setImageRect] = useState(null); // { left, top, width, height } px, 컨테이너 기준
   const [mealType, setMealType] = useState('breakfast');
+  const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef(null);
   const imgContainerRef = useRef(null);
   const imgRef = useRef(null);
@@ -693,10 +695,64 @@ const App = () => {
                   <RefreshCw size={20} /> 다시 찍기
                 </button>
                 <button
-                  onClick={() => navigate('/home/dailyLog')}
-                  className="bg-[#1E2923] text-white py-5 rounded-3xl font-bold flex items-center justify-center gap-2 hover:bg-[#2a3a31] transition-all shadow-lg active:scale-95"
+                  disabled={isSaving || !user?.id}
+                  onClick={async () => {
+                    if (!user?.id) return;
+                    const totals = computedTotals ?? {
+                      calories: analysis.calories,
+                      carbs: analysis.macros?.carbs ?? 0,
+                      sugar: analysis.macros?.sugar ?? 0,
+                      protein: analysis.macros?.protein ?? 0,
+                      fat: analysis.macros?.fat ?? 0,
+                    };
+                    const foods = (analysis.rawFoods || []).map((raw, i) => {
+                      const applied = appliedFoods[i];
+                      const baseAmount = raw.amount || 1;
+                      const amount = applied?.amount ?? raw.amount ?? 0;
+                      const ratio = baseAmount > 0 ? amount / baseAmount : 1;
+                      return {
+                        name: applied?.name ?? raw.name ?? '음식',
+                        amount: Number(amount) || 0,
+                        calories: Math.round((Number(raw.calories) || 0) * ratio),
+                        carbohydrate: (Number(raw.carbohydrate) || 0) * ratio,
+                        protein: (Number(raw.protein) || 0) * ratio,
+                        fat: (Number(raw.fat) || 0) * ratio,
+                        sugars: (Number(raw.sugars) || 0) * ratio,
+                      };
+                    });
+                    if (foods.length === 0) {
+                      setError('저장할 음식이 없습니다.');
+                      return;
+                    }
+                    setIsSaving(true);
+                    setError(null);
+                    try {
+                      await saveScanToDiary({
+                        userId: user.id,
+                        mealType,
+                        mealTime: new Date().toISOString(),
+                        imageUrl: selectedImage || null,
+                        foods,
+                      });
+                      navigate('/home/dailyLog');
+                    } catch (err) {
+                      setError(err.message || '저장 중 오류가 발생했습니다.');
+                    } finally {
+                      setIsSaving(false);
+                    }
+                  }}
+                  className="bg-[#1E2923] text-white py-5 rounded-3xl font-bold flex items-center justify-center gap-2 hover:bg-[#2a3a31] transition-all shadow-lg active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
-                  기록하기 <ChevronRight size={20} />
+                  {isSaving ? (
+                    <>
+                      <Loader2 size={20} className="animate-spin" />
+                      저장 중...
+                    </>
+                  ) : (
+                    <>
+                      기록하기 <ChevronRight size={20} />
+                    </>
+                  )}
                 </button>
               </div>
             </div>
