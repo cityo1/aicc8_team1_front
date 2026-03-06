@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import {
     Box, Paper, Typography, IconButton, Divider,
     TextField, Button, LinearProgress, Collapse, Stack,
@@ -96,6 +96,29 @@ function getMealTotalCalories(meal) {
     return meal.foods.reduce((sum, f) => sum + f.calories, 0);
 }
 
+const DAILY_LOG_STORAGE_KEY = 'dailyLogData';
+
+function loadDailyLogFromStorage() {
+    try {
+        const stored = localStorage.getItem(DAILY_LOG_STORAGE_KEY);
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed && typeof parsed === 'object') return parsed;
+        }
+    } catch (e) {
+        console.warn('일일식사기록 로드 실패:', e);
+    }
+    return null;
+}
+
+function saveDailyLogToStorage(data) {
+    try {
+        localStorage.setItem(DAILY_LOG_STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+        console.warn('일일식사기록 저장 실패:', e);
+    }
+}
+
 // ─── 영양소 바 ────────────────────────────────────────────────────────────────
 function NutrientBar({ label, value, daily, color }) {
     const pct = Math.min((value / daily) * 100, 100);
@@ -121,7 +144,7 @@ function NutrientBar({ label, value, daily, color }) {
 }
 
 // ─── 식사 카드 ────────────────────────────────────────────────────────────────
-function MealCard({ meal, data, isToday, dateStr }) {
+function MealCard({ meal, data, isToday, dateStr, scanImage }) {
     const [open, setOpen] = useState(false);
     const [memo, setMemo] = useState(data?.memo || '');
     const totalCal = getMealTotalCalories(data);
@@ -187,6 +210,27 @@ function MealCard({ meal, data, isToday, dateStr }) {
             <Collapse in={open}>
                 <Divider />
                 <Box sx={{ p: 2.5 }}>
+                    {/* AI 식단분석 기록 이미지 (아침 탭, 음식 목록 바로 위) */}
+                    {scanImage && meal.key === 'breakfast' && (
+                        <Box sx={{ mb: 2 }}>
+                            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: 'block', mb: 1 }}>
+                                AI 식단분석 기록
+                            </Typography>
+                            <Box
+                                component="img"
+                                src={scanImage}
+                                alt="분석된 식사 사진"
+                                sx={{
+                                    width: 100,
+                                    height: 100,
+                                    objectFit: 'cover',
+                                    borderRadius: 2,
+                                    border: '2px solid #FF8243',
+                                    boxShadow: 1,
+                                }}
+                            />
+                        </Box>
+                    )}
                     {/* 음식 리스트 */}
                     <Typography variant="body2" fontWeight={700} mb={1} color="text.secondary">
                         음식 목록
@@ -938,10 +982,102 @@ function NutritionSummaryPanel({ date, data }) {
 // ─── 메인 페이지 ──────────────────────────────────────────────────────────────
 export default function DailyLogPage() {
     const { user } = useAuth();
+    const location = useLocation();
+    const navigate = useNavigate();
     const today = new Date();
     const [selectedDate, setSelectedDate] = useState(today);
     const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
-    const [mealData, setMealData] = useState(MOCK_DATA);
+    const [mealData, setMealData] = useState(() => {
+        const stored = loadDailyLogFromStorage();
+        return stored ? { ...MOCK_DATA, ...stored } : MOCK_DATA;
+    });
+    const [scanPreviewImage, setScanPreviewImage] = useState(null);
+
+    useEffect(() => {
+        saveDailyLogToStorage(mealData);
+    }, [mealData]);
+
+    // ScanAnalysis에서 기록하기로 넘어온 데이터 처리 (기존 기능 건드리지 않고 추가)
+    const scanProcessedRef = useRef(false);
+    useEffect(() => {
+        const s = location.state;
+        if (!s?.fromScan || !s.mealType || !s.foods?.length || scanProcessedRef.current) return;
+        scanProcessedRef.current = true;
+
+        const scanDate = s.date ? new Date(s.date + 'T12:00:00') : today;
+        setSelectedDate(scanDate);
+        setCurrentMonth(new Date(scanDate.getFullYear(), scanDate.getMonth(), 1));
+        if (s.image) setScanPreviewImage(s.image);
+
+        const rawFoods = s.foods;
+        const totalCal = s.totalCalories || 0;
+
+        const foodsToAdd = rawFoods.map((f) => {
+            const calories = Math.round(Number(f.calories) || 0);
+            const carbs = Number(f.carbohydrate) || 0;
+            const protein = Number(f.protein) || 0;
+            const fat = Number(f.fat) || 0;
+            const sugar = Number(f.sugars) || 0;
+            return {
+                name: String(f.name || '').trim() || '음식',
+                calories,
+                nutrients: { carbs, protein, fat, sugar },
+                image: null,
+            };
+        });
+
+        setMealData((prev) => {
+            const dateStr = formatDate(scanDate);
+            const existing = prev[dateStr] || {
+                summary: { calories: 0, carbs: 0, protein: 0, fat: 0, sugar: 0 },
+                breakfast: { foods: [], nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 }, memo: '' },
+                lunch: { foods: [], nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 }, memo: '' },
+                dinner: { foods: [], nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 }, memo: '' },
+                snack: { foods: [], nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 }, memo: '' },
+            };
+            const mealKey = s.mealType;
+            const existingMeal = existing[mealKey];
+            const updatedFoods = [...(existingMeal.foods || []), ...foodsToAdd];
+            const newNutrients = foodsToAdd.reduce(
+                (acc, f) => ({
+                    carbs: acc.carbs + (f.nutrients?.carbs || 0),
+                    protein: acc.protein + (f.nutrients?.protein || 0),
+                    fat: acc.fat + (f.nutrients?.fat || 0),
+                    sugar: acc.sugar + (f.nutrients?.sugar || 0),
+                }),
+                { carbs: 0, protein: 0, fat: 0, sugar: 0 }
+            );
+            const updatedNutrients = {
+                carbs: (existingMeal.nutrients?.carbs || 0) + newNutrients.carbs,
+                protein: (existingMeal.nutrients?.protein || 0) + newNutrients.protein,
+                fat: (existingMeal.nutrients?.fat || 0) + newNutrients.fat,
+                sugar: (existingMeal.nutrients?.sugar || 0) + newNutrients.sugar,
+            };
+            const newCal = foodsToAdd.reduce((sum, f) => sum + f.calories, 0);
+            return {
+                ...prev,
+                [dateStr]: {
+                    ...existing,
+                    [mealKey]: {
+                        ...existingMeal,
+                        foods: updatedFoods,
+                        nutrients: updatedNutrients,
+                        memo: existingMeal.memo || '',
+                    },
+                    summary: {
+                        ...existing.summary,
+                        calories: (existing.summary?.calories || 0) + newCal,
+                        carbs: (existing.summary?.carbs || 0) + newNutrients.carbs,
+                        protein: (existing.summary?.protein || 0) + newNutrients.protein,
+                        fat: (existing.summary?.fat || 0) + newNutrients.fat,
+                        sugar: (existing.summary?.sugar || 0) + newNutrients.sugar,
+                    },
+                },
+            };
+        });
+
+        navigate(location.pathname, { replace: true, state: {} });
+    }, []);
 
     const handleMonthChange = (delta) => {
         setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
@@ -1147,7 +1283,7 @@ export default function DailyLogPage() {
 
                                 {/* 식사 카드 */}
                                 <Box sx={{ flexGrow: 1, pb: index < MEALS.length - 1 ? 1.5 : 0 }}>
-                                    <MealCard meal={meal} data={dayData?.[meal.key]} isToday={isToday} dateStr={dateStr} />
+                                    <MealCard meal={meal} data={dayData?.[meal.key]} isToday={isToday} dateStr={dateStr} scanImage={scanPreviewImage} />
                                 </Box>
                             </Box>
                         ))}

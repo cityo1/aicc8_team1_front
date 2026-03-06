@@ -28,14 +28,24 @@ export function generateFeedback(scoreResult) {
       val: safeMeal.protein,
       goal: target?.protein ?? 1,
     },
-    { name: '당류', score: breakdown?.sug ?? 0, val: safeMeal.sugar, goal: target?.sugar ?? 1 },
+    {
+      name: '당류',
+      score: breakdown?.sug ?? 0,
+      val: safeMeal.sugar,
+      goal: target?.sugar ?? 1,
+    },
     {
       name: '탄수화물',
       score: breakdown?.carb ?? 0,
       val: safeMeal.carbs,
       goal: target?.carbs ?? 1,
     },
-    { name: '지방', score: breakdown?.fat ?? 0, val: safeMeal.fat, goal: target?.fat ?? 1 },
+    {
+      name: '지방',
+      score: breakdown?.fat ?? 0,
+      val: safeMeal.fat,
+      goal: target?.fat ?? 1,
+    },
   ];
 
   nutrients.forEach((n) => {
@@ -56,15 +66,8 @@ export function generateFeedback(scoreResult) {
     }
   });
 
-  // 3. 한 줄 꿀팁 (랜덤성 부여 가능)
-  const tip =
-    totalScore < 70
-      ? 'Tip: 물을 충분히 마시면 대사에 도움이 됩니다!'
-      : 'Tip: 오늘처럼만 드시면 건강 관리는 문제없어요!';
-
   return {
     title: overallMsg,
     details: feedbackLines,
-    tip: tip,
   };
 }
