@@ -1,4 +1,10 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from 'react';
 import {
   Camera,
   ChevronRight,
@@ -10,8 +16,15 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { analyzeFoodImage, reanalyzeFood } from '../../api/scan';
+import { useAuth } from '../../contexts/AuthContext';
+import {
+  calculateNutritionScore,
+  buildUserForScore,
+} from '../common/calculateNutritionScore';
+import { generateFeedback } from '../common/generateFeedback';
 
 const App = () => {
+  const { user } = useAuth();
   const [step, setStep] = useState('upload'); // upload, scanning, result
   const [selectedImage, setSelectedImage] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -22,13 +35,15 @@ const App = () => {
   const [error, setError] = useState(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [imageRect, setImageRect] = useState(null); // { left, top, width, height } px, 컨테이너 기준
+  const [mealType, setMealType] = useState('breakfast');
   const fileInputRef = useRef(null);
   const imgContainerRef = useRef(null);
   const imgRef = useRef(null);
   const navigate = useNavigate();
 
   const measureImage = useCallback(() => {
-    if (!imgContainerRef.current || !imgRef.current || step !== 'result') return;
+    if (!imgContainerRef.current || !imgRef.current || step !== 'result')
+      return;
     const containerRect = imgContainerRef.current.getBoundingClientRect();
     const imgElRect = imgRef.current.getBoundingClientRect();
     setImageRect({
@@ -54,7 +69,7 @@ const App = () => {
   useEffect(() => {
     if (analysis?.rawFoods?.length) {
       const initial = analysis.rawFoods.map((f) => ({
-        name: String(f.name ?? '').trim() || '음식',
+        name: String(f.name ?? '').trim(),
         amount: Number(f.amount) || 0,
       }));
       setEditableFoods(initial);
@@ -68,7 +83,7 @@ const App = () => {
       if (next[index])
         next[index] = {
           ...next[index],
-          name: String(newName ?? '').trim() || '음식',
+          name: String(newName ?? '').trim(),
         };
       return next;
     });
@@ -83,6 +98,17 @@ const App = () => {
           amount: Math.max(0, Number(value) || 0),
         };
       return next;
+    });
+  };
+
+  const addFoodRow = () => {
+    setEditableFoods((prev) => [...prev, { name: '', amount: 0 }]);
+  };
+
+  const removeFoodRow = (index) => {
+    setEditableFoods((prev) => {
+      if (prev.length <= 1) return prev;
+      return prev.filter((_, i) => i !== index);
     });
   };
 
@@ -106,9 +132,15 @@ const App = () => {
       );
       const sugar = foods.reduce((s, f) => s + (Number(f.sugars) || 0), 0);
 
+      const mergedFoods = foods.map((f, i) => ({
+        ...f,
+        name: payload[i]?.name ?? f.name,
+        amount: payload[i]?.amount ?? f.amount,
+      }));
+
       setAnalysis((prev) => ({
         ...prev,
-        rawFoods: foods,
+        rawFoods: mergedFoods,
         calories: totalCalories,
         macros: { protein, fat, carbs, sugar },
       }));
@@ -140,6 +172,26 @@ const App = () => {
     });
     return { calories: Math.round(calories), carbs, sugar, protein, fat };
   })();
+
+  const scoreAndFeedback = useMemo(() => {
+    const totals =
+      computedTotals ??
+      (analysis
+        ? {
+            calories: analysis.calories,
+            carbs: analysis.macros?.carbs ?? 0,
+            sugar: analysis.macros?.sugar ?? 0,
+            protein: analysis.macros?.protein ?? 0,
+            fat: analysis.macros?.fat ?? 0,
+          }
+        : null);
+    if (!totals) return null;
+    const userForScore = buildUserForScore(user);
+    const scoreResult = calculateNutritionScore(userForScore, totals);
+    scoreResult.meal = totals;
+    const feedback = generateFeedback(scoreResult);
+    return { score: scoreResult.totalScore, feedback };
+  }, [computedTotals, analysis, user, appliedFoods]);
 
   const processFile = (file) => {
     if (!file || !file.type.startsWith('image/')) {
@@ -345,40 +397,50 @@ const App = () => {
               {/* 분석한 음식에 박스 영역 표시 - 픽셀 좌표, 이미지 영역 내로 클램프 */}
               {analysis.rawFoods?.some((f) => f.bbox) && imageRect && (
                 <div className="absolute inset-0 pointer-events-none">
-                  {analysis.rawFoods.map(
-                    (food, i) => {
-                      if (!food.bbox) return null;
-                      const x = (food.bbox.x ?? food.bbox.left ?? 0) / 100;
-                      const y = (food.bbox.y ?? food.bbox.top ?? 0) / 100;
-                      const w = (food.bbox.w ?? food.bbox.width ?? 10) / 100;
-                      const h = (food.bbox.h ?? food.bbox.height ?? 10) / 100;
-                      let left = imageRect.left + x * imageRect.width;
-                      let top = imageRect.top + y * imageRect.height;
-                      let width = w * imageRect.width;
-                      let height = h * imageRect.height;
-                      left = Math.max(imageRect.left, Math.min(left, imageRect.left + imageRect.width - 4));
-                      top = Math.max(imageRect.top, Math.min(top, imageRect.top + imageRect.height - 4));
-                      width = Math.min(width, imageRect.left + imageRect.width - left);
-                      height = Math.min(height, imageRect.top + imageRect.height - top);
-                      if (width < 2 || height < 2) return null;
-                      return (
-                        <div
-                          key={i}
-                          className="absolute border-2 border-yellow-400 bg-yellow-400/20"
-                          style={{
-                            left: `${left}px`,
-                            top: `${top}px`,
-                            width: `${width}px`,
-                            height: `${height}px`,
-                          }}
-                        >
-                          <span className="absolute -top-6 left-0 text-xs font-bold text-yellow-900 bg-yellow-200/95 px-1.5 py-0.5 rounded whitespace-nowrap">
-                            {appliedFoods[i]?.name ?? food.name}
-                          </span>
-                        </div>
-                      );
-                    },
-                  )}
+                  {analysis.rawFoods.map((food, i) => {
+                    if (!food.bbox) return null;
+                    const x = (food.bbox.x ?? food.bbox.left ?? 0) / 100;
+                    const y = (food.bbox.y ?? food.bbox.top ?? 0) / 100;
+                    const w = (food.bbox.w ?? food.bbox.width ?? 10) / 100;
+                    const h = (food.bbox.h ?? food.bbox.height ?? 10) / 100;
+                    let left = imageRect.left + x * imageRect.width;
+                    let top = imageRect.top + y * imageRect.height;
+                    let width = w * imageRect.width;
+                    let height = h * imageRect.height;
+                    left = Math.max(
+                      imageRect.left,
+                      Math.min(left, imageRect.left + imageRect.width - 4),
+                    );
+                    top = Math.max(
+                      imageRect.top,
+                      Math.min(top, imageRect.top + imageRect.height - 4),
+                    );
+                    width = Math.min(
+                      width,
+                      imageRect.left + imageRect.width - left,
+                    );
+                    height = Math.min(
+                      height,
+                      imageRect.top + imageRect.height - top,
+                    );
+                    if (width < 2 || height < 2) return null;
+                    return (
+                      <div
+                        key={i}
+                        className="absolute border-2 border-yellow-400 bg-yellow-400/20"
+                        style={{
+                          left: `${left}px`,
+                          top: `${top}px`,
+                          width: `${width}px`,
+                          height: `${height}px`,
+                        }}
+                      >
+                        <span className="absolute -top-6 left-0 text-xs font-bold text-yellow-900 bg-yellow-200/95 px-1.5 py-0.5 rounded whitespace-nowrap">
+                          {appliedFoods[i]?.name || food.name || '음식'}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -390,7 +452,9 @@ const App = () => {
                     <span className="text-[10px] font-bold uppercase">
                       Score
                     </span>
-                    <span className="font-black text-xl">{analysis.score}</span>
+                    <span className="font-black text-xl">
+                      {scoreAndFeedback?.score ?? analysis.score ?? 85}
+                    </span>
                   </div>
                 </div>
 
@@ -410,6 +474,7 @@ const App = () => {
                             <th className="text-right py-2 px-4 font-bold text-[#1E2923] w-24">
                               g
                             </th>
+                            <th className="w-24"></th>
                           </tr>
                         </thead>
                         <tbody>
@@ -429,20 +494,42 @@ const App = () => {
                                 />
                               </td>
                               <td className="py-2 px-3 text-right">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  step={1}
-                                  value={food.amount || ''}
-                                  onChange={(e) =>
-                                    updateFoodAmount(i, e.target.value)
-                                  }
-                                  placeholder="0"
-                                  className="w-16 text-right bg-transparent border-b border-transparent hover:border-[#1E2923]/20 focus:border-[#FF8243] focus:outline-none py-1 text-[#1E2923] font-medium"
-                                />
+                                <div className="flex items-center justify-end gap-0.5">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    value={food.amount || ''}
+                                    onChange={(e) =>
+                                      updateFoodAmount(i, e.target.value)
+                                    }
+                                    placeholder="0"
+                                    className="w-14 text-right bg-transparent border-b border-transparent hover:border-[#1E2923]/20 focus:border-[#FF8243] focus:outline-none py-1 text-[#1E2923] font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  />
+                                  <span className="text-[#1E2923]/70 font-medium text-sm">g</span>
+                                </div>
+                              </td>
+                              <td className="py-2 px-2 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => removeFoodRow(i)}
+                                  className="w-7 h-7 flex items-center justify-center text-[#1E2923]/50 hover:text-red-500 hover:bg-red-50/80 rounded-lg transition-colors text-lg leading-none"
+                                >
+                                  −
+                                </button>
                               </td>
                             </tr>
                           ))}
+                          <tr className="border-t border-emerald-100/60">
+                            <td colSpan={3} className="py-2 px-3">
+                              <button
+                                type="button"
+                                onClick={addFoodRow}
+                                className="w-full py-2 text-sm font-medium text-[#1E2923]/70 hover:text-[#FF8243] hover:bg-emerald-50/50 rounded-lg transition-colors"
+                              >
+                                + 행 추가
+                              </button>
+                            </td>
+                          </tr>
                         </tbody>
                       </table>
                     </div>
@@ -515,13 +602,15 @@ const App = () => {
                         <div className="flex justify-between text-sm font-bold">
                           <span>영양 밸런스</span>
                           <span className="text-[#FF8243]">
-                            {analysis.score}%
+                            {scoreAndFeedback?.score ?? analysis.score ?? 85}%
                           </span>
                         </div>
                         <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
                           <div
                             className="h-full bg-[#FF8243] rounded-full transition-all duration-1000 shadow-[0_0_8px_rgba(255,130,67,0.4)]"
-                            style={{ width: `${analysis.score}%` }}
+                            style={{
+                              width: `${Math.min(100, scoreAndFeedback?.score ?? analysis.score ?? 85)}%`,
+                            }}
                           ></div>
                         </div>
                       </div>
@@ -533,11 +622,65 @@ const App = () => {
               <div className="bg-[#1E2923] rounded-3xl p-4 text-white shadow-lg relative">
                 <div className="flex items-center gap-2 mb-3">
                   <CheckCircle2 size={22} className="text-[#FF8243]" />
-                  <h3 className="font-bold text-lg">AI 코멘트</h3>
+                  <h3 className="font-bold text-lg">영양 피드백</h3>
                 </div>
-                <p className="text-[1rem] leading-relaxed opacity-90 font-medium">
-                  "{analysis.tips}"
+                {scoreAndFeedback?.feedback ? (
+                  <div className="space-y-2">
+                    <p className="text-[1rem] leading-relaxed opacity-90 font-medium">
+                      {scoreAndFeedback.feedback.title}
+                    </p>
+                    {scoreAndFeedback.feedback.details?.length > 0 && (
+                      <ul className="list-disc list-inside text-sm opacity-90 space-y-1">
+                        {scoreAndFeedback.feedback.details.map((line, i) => (
+                          <li
+                            key={i}
+                            dangerouslySetInnerHTML={{
+                              __html: line.replace(
+                                /\*\*(.*?)\*\*/g,
+                                '<strong>$1</strong>',
+                              ),
+                            }}
+                          />
+                        ))}
+                      </ul>
+                    )}
+                    <p className="text-sm opacity-80 pt-1">
+                      {scoreAndFeedback.feedback.tip}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-[1rem] leading-relaxed opacity-90 font-medium">
+                    {analysis.tips}
+                  </p>
+                )}
+              </div>
+
+              {/* 식사 구분 (아침/점심/저녁/간식 선택) */}
+              <div className="bg-white rounded-3xl p-4 shadow-sm border border-slate-100">
+                <p className="text-xs font-bold text-[#1E2923]/60 uppercase mb-3">
+                  식사 구분
                 </p>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { value: 'breakfast', label: '아침' },
+                    { value: 'lunch', label: '점심' },
+                    { value: 'dinner', label: '저녁' },
+                    { value: 'snack', label: '간식' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setMealType(opt.value)}
+                      className={`py-3 px-3 rounded-xl font-bold text-sm transition-all ${
+                        mealType === opt.value
+                          ? 'bg-[#FF8243] text-white shadow-md ring-2 ring-[#FF8243]/40'
+                          : 'bg-slate-100 text-[#1E2923]/70 hover:bg-slate-200'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -549,7 +692,34 @@ const App = () => {
                 </button>
                 <button
                   className="bg-[#1E2923] text-white py-5 rounded-3xl font-bold flex items-center justify-center gap-2 hover:bg-[#2a3a31] transition-all shadow-lg active:scale-95"
-                  onClick={() => navigate('/home/dailyLog')}
+                  onClick={() => {
+                    const totals =
+                      computedTotals ?? {
+                        calories: analysis.calories,
+                        carbs: analysis.macros?.carbs ?? 0,
+                        sugar: analysis.macros?.sugar ?? 0,
+                        protein: analysis.macros?.protein ?? 0,
+                        fat: analysis.macros?.fat ?? 0,
+                      };
+                    const dt = new Date();
+                    const mealTime = dt.toISOString();
+                    navigate('/home/dailyLog', {
+                      state: {
+                        fromScan: true,
+                        mealType,
+                        mealTime,
+                        date: dt.toISOString().slice(0, 10),
+                        image: selectedImage,
+                        foods: analysis.rawFoods.map((f, i) => ({
+                          ...f,
+                          name: appliedFoods[i]?.name ?? f.name,
+                          amount: appliedFoods[i]?.amount ?? f.amount,
+                        })),
+                        totalCalories: totals?.calories ?? analysis.calories,
+                        totals,
+                      },
+                    });
+                  }}
                 >
                   기록하기 <ChevronRight size={20} />
                 </button>
