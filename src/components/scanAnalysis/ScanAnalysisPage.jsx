@@ -505,7 +505,9 @@ const App = () => {
                                     placeholder="0"
                                     className="w-14 text-right bg-transparent border-b border-transparent hover:border-[#1E2923]/20 focus:border-[#FF8243] focus:outline-none py-1 text-[#1E2923] font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                   />
-                                  <span className="text-[#1E2923]/70 font-medium text-sm">g</span>
+                                  <span className="text-[#1E2923]/70 font-medium text-sm">
+                                    g
+                                  </span>
                                 </div>
                               </td>
                               <td className="py-2 px-2 text-right">
@@ -691,35 +693,8 @@ const App = () => {
                   <RefreshCw size={20} /> 다시 찍기
                 </button>
                 <button
+                  onClick={() => navigate('/home/dailyLog')}
                   className="bg-[#1E2923] text-white py-5 rounded-3xl font-bold flex items-center justify-center gap-2 hover:bg-[#2a3a31] transition-all shadow-lg active:scale-95"
-                  onClick={() => {
-                    const totals =
-                      computedTotals ?? {
-                        calories: analysis.calories,
-                        carbs: analysis.macros?.carbs ?? 0,
-                        sugar: analysis.macros?.sugar ?? 0,
-                        protein: analysis.macros?.protein ?? 0,
-                        fat: analysis.macros?.fat ?? 0,
-                      };
-                    const dt = new Date();
-                    const mealTime = dt.toISOString();
-                    navigate('/home/dailyLog', {
-                      state: {
-                        fromScan: true,
-                        mealType,
-                        mealTime,
-                        date: dt.toISOString().slice(0, 10),
-                        image: selectedImage,
-                        foods: analysis.rawFoods.map((f, i) => ({
-                          ...f,
-                          name: appliedFoods[i]?.name ?? f.name,
-                          amount: appliedFoods[i]?.amount ?? f.amount,
-                        })),
-                        totalCalories: totals?.calories ?? analysis.calories,
-                        totals,
-                      },
-                    });
-                  }}
                 >
                   기록하기 <ChevronRight size={20} />
                 </button>
