@@ -39,75 +39,8 @@ import {
 import FoodSearchInput from '../components/FoodSearchInput';
 import { useAuth } from '../contexts/AuthContext';
 
-// ─── Mock Data ──────────────────────────────────────────────────────────────
-const MOCK_DATA = {
-  '2026-03-01': {
-    summary: { calories: 1580, carbs: 195, protein: 68, fat: 48, sugar: 32 },
-    breakfast: {
-      foods: [
-        { name: '토스트', calories: 200 },
-        { name: '아보카도', calories: 120 },
-        { name: '아메리카노', calories: 10 },
-      ],
-      nutrients: { carbs: 30, protein: 7, fat: 18, sugar: 4 },
-      memo: '',
-    },
-    lunch: {
-      foods: [
-        { name: '비빔밥', calories: 540 },
-        { name: '된장국', calories: 45 },
-      ],
-      nutrients: { carbs: 75, protein: 20, fat: 14, sugar: 8 },
-      memo: '학식 점심',
-    },
-    dinner: {
-      foods: [
-        { name: '닭볶음탕', calories: 380 },
-        { name: '현미밥', calories: 210 },
-      ],
-      nutrients: { carbs: 42, protein: 32, fat: 12, sugar: 10 },
-      memo: '',
-    },
-    snack: {
-      foods: [{ name: '카페라떼', calories: 150 }],
-      nutrients: { carbs: 18, protein: 6, fat: 6, sugar: 14 },
-      memo: '',
-    },
-  },
-  '2026-03-02': {
-    summary: { calories: 2100, carbs: 260, protein: 80, fat: 72, sugar: 58 },
-    breakfast: {
-      foods: [
-        { name: '계란 2개', calories: 140 },
-        { name: '식빵', calories: 130 },
-        { name: '우유', calories: 120 },
-      ],
-      nutrients: { carbs: 28, protein: 18, fat: 14, sugar: 12 },
-      memo: '',
-    },
-    lunch: {
-      foods: [
-        { name: '김밥', calories: 380 },
-        { name: '라면', calories: 500 },
-      ],
-      nutrients: { carbs: 90, protein: 18, fat: 24, sugar: 8 },
-      memo: '편의점 점심 😅',
-    },
-    dinner: {
-      foods: [
-        { name: '치킨', calories: 560 },
-        { name: '맥주', calories: 140 },
-      ],
-      nutrients: { carbs: 38, protein: 36, fat: 32, sugar: 6 },
-      memo: '치맥 🍗🍺',
-    },
-    snack: {
-      foods: [{ name: '초코바', calories: 230 }],
-      nutrients: { carbs: 28, protein: 4, fat: 12, sugar: 22 },
-      memo: '',
-    },
-  },
-};
+// ─── API 기본 URL ──────────────────────────────────────────────────────────
+const API_BASE_URL = 'http://localhost:8000';
 
 // ─── 상수 ────────────────────────────────────────────────────────────────────
 const MEALS = [
@@ -172,27 +105,30 @@ function getMealTotalCalories(meal) {
   return meal.foods.reduce((sum, f) => sum + f.calories, 0);
 }
 
-const DAILY_LOG_STORAGE_KEY = 'dailyLogData';
+// ─── API 응답을 프론트엔드 형식으로 변환 ────────────────────────────────────
+function transformApiResponse(apiData) {
+  if (!apiData || !apiData.success) return null;
 
-function loadDailyLogFromStorage() {
-  try {
-    const stored = localStorage.getItem(DAILY_LOG_STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (parsed && typeof parsed === 'object') return parsed;
-    }
-  } catch (e) {
-    console.warn('일일식사기록 로드 실패:', e);
-  }
-  return null;
-}
+  const transformMeal = (meal) => ({
+    foods: (meal.foods || []).map((f) => ({
+      id: f.id,
+      name: f.foodName || '알 수 없는 음식',
+      calories: f.calories || 0,
+      nutrients: f.nutrients || { carbs: 0, protein: 0, fat: 0, sugar: 0 },
+      image: f.imageUrl || null,
+      memo: f.memo || null,
+    })),
+    nutrients: meal.nutrients || { carbs: 0, protein: 0, fat: 0, sugar: 0 },
+    memo: '',
+  });
 
-function saveDailyLogToStorage(data) {
-  try {
-    localStorage.setItem(DAILY_LOG_STORAGE_KEY, JSON.stringify(data));
-  } catch (e) {
-    console.warn('일일식사기록 저장 실패:', e);
-  }
+  return {
+    summary: apiData.summary || { calories: 0, carbs: 0, protein: 0, fat: 0, sugar: 0 },
+    breakfast: transformMeal(apiData.breakfast),
+    lunch: transformMeal(apiData.lunch),
+    dinner: transformMeal(apiData.dinner),
+    snack: transformMeal(apiData.snack),
+  };
 }
 
 // ─── 영양소 바 ────────────────────────────────────────────────────────────────
@@ -568,7 +504,7 @@ const EMPTY_FOOD = () => ({
   image: null,
 });
 
-function AddRecordCard({ onSave, userId }) {
+function AddRecordCard({ onRefresh, userId }) {
   const [open, setOpen] = useState(false);
   const [selectedMeal, setSelectedMeal] = useState('breakfast');
   const [foods, setFoods] = useState([EMPTY_FOOD()]);
@@ -661,43 +597,57 @@ function AddRecordCard({ onSave, userId }) {
   const handleSubmit = async () => {
     const validFoods = foods.filter((f) => f.name.trim() && f.foodCode);
     if (!validFoods.length) {
-      alert('음식을 검색하여 선택해주세요.');
+      alert('음식을 검색하여 선택해주세요.\n(음식 이름을 입력 후 드롭다운에서 선택해야 합니다)');
+      return;
+    }
+
+    if (!userId) {
+      alert('로그인이 필요합니다.');
       return;
     }
 
     try {
       // 각 음식별로 API POST 요청
-      const promises = validFoods.map((f) =>
-        fetch('http://localhost:8000/api/meals', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId,
-            foodCode: f.foodCode,
-            servings: 1,
-            mealType: selectedMeal,
-            eatenAt: new Date().toISOString(),
-          }),
+      const results = await Promise.all(
+        validFoods.map(async (f) => {
+          const response = await fetch(`${API_BASE_URL}/api/meals`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId,
+              foodCode: f.foodCode,
+              foodName: f.name,
+              servings: 1,
+              mealType: selectedMeal,
+              mealTime: new Date().toISOString(),
+              memo: memo || null,
+              imageUrl: f.image || null,
+            }),
+          });
+
+          const data = await response.json();
+          console.log('API 응답:', response.status, data);
+
+          if (!response.ok) {
+            throw new Error(data.message || `HTTP ${response.status}`);
+          }
+          return data;
         }),
       );
 
-      await Promise.all(promises);
+      console.log('저장 완료:', results);
 
-      // 부모 컴포넌트에 음식 데이터 전달 (UI 업데이트용)
-      const foodsToSave = validFoods.map((f) => ({
-        name: f.name,
-        calories: Number(f.calories) || 0,
-        nutrients: f.nutrients || { carbs: 0, protein: 0, fat: 0, sugar: 0 },
-        image: f.image || null,
-      }));
-      onSave(selectedMeal, foodsToSave, memo);
+      // 저장 성공 후 데이터 새로고침
+      if (onRefresh) {
+        await onRefresh();
+      }
 
       setFoods([EMPTY_FOOD()]);
       setMemo('');
       setOpen(false);
     } catch (error) {
       console.error('식사 기록 저장 실패:', error);
-      alert('저장에 실패했습니다. 다시 시도해주세요.');
+      alert(`저장에 실패했습니다: ${error.message}`);
     }
   };
 
@@ -1079,6 +1029,7 @@ function CustomCalendar({
   onDateSelect,
   currentMonth,
   onMonthChange,
+  dayData,
 }) {
   const today = new Date();
   const year = currentMonth.getFullYear();
@@ -1091,6 +1042,10 @@ function CustomCalendar({
     ...Array(firstDayOfWeek).fill(null),
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ];
+
+  // 선택된 날짜의 총 칼로리 계산
+  const selectedDateStr = formatDate(selectedDate);
+  const selectedDayCalories = dayData?.summary?.calories || 0;
 
   return (
     <Box>
@@ -1154,15 +1109,14 @@ function CustomCalendar({
           const isToday = isSameDay(thisDate, today);
           const isSelected = isSameDay(thisDate, selectedDate);
           const isFuture = thisDate > today;
-          const hasData = !!MOCK_DATA[dateStr];
+          // 선택된 날짜만 데이터 유무 표시 (DB에서 불러온 데이터 기준)
+          const hasData = isSelected && selectedDayCalories > 0;
           const dayOfWeek = thisDate.getDay();
 
           return (
             <Tooltip
               key={idx}
-              title={
-                hasData ? `${MOCK_DATA[dateStr].summary.calories} kcal` : ''
-              }
+              title={hasData ? `${selectedDayCalories} kcal` : ''}
               arrow
               placement="top"
             >
@@ -1335,17 +1289,45 @@ export default function DailyLogPage() {
   const [currentMonth, setCurrentMonth] = useState(
     new Date(today.getFullYear(), today.getMonth(), 1),
   );
-  const [mealData, setMealData] = useState(() => {
-    const stored = loadDailyLogFromStorage();
-    return stored ? { ...MOCK_DATA, ...stored } : MOCK_DATA;
-  });
+  const [dayData, setDayData] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [scanPreview, setScanPreview] = useState(null); // { image, mealType }
 
-  useEffect(() => {
-    saveDailyLogToStorage(mealData);
-  }, [mealData]);
+  // API에서 날짜별 식사 데이터 불러오기
+  const fetchDailyData = async (date, userId) => {
+    if (!userId) return;
 
-  // ScanAnalysis에서 기록하기로 넘어온 데이터 처리 (기존 기능 건드리지 않고 추가)
+    setIsLoading(true);
+    try {
+      const dateStr = formatDate(date);
+      const response = await fetch(
+        `${API_BASE_URL}/api/diary/daily?userId=${userId}&date=${dateStr}`,
+      );
+      if (response.ok) {
+        const data = await response.json();
+        console.log('식사 기록 조회:', data);
+        const transformed = transformApiResponse(data);
+        setDayData(transformed);
+      } else {
+        console.error('식사 기록 조회 실패:', response.status);
+        setDayData(null);
+      }
+    } catch (error) {
+      console.error('식사 기록 조회 실패:', error);
+      setDayData(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 페이지 로드 시 오늘 날짜 데이터 불러오기
+  useEffect(() => {
+    if (user?.id) {
+      fetchDailyData(today, user.id);
+    }
+  }, [user?.id]);
+
+  // ScanAnalysis에서 기록하기로 넘어온 데이터 처리
   const scanProcessedRef = useRef(false);
   useEffect(() => {
     const s = location.state;
@@ -1364,119 +1346,13 @@ export default function DailyLogPage() {
     if (s.image && s.mealType)
       setScanPreview({ image: s.image, mealType: s.mealType });
 
-    const rawFoods = s.foods;
-    const totalCal = s.totalCalories || 0;
-
-    const foodsToAdd = rawFoods.map((f) => {
-      const calories = Math.round(Number(f.calories) || 0);
-      const carbs = Number(f.carbohydrate) || 0;
-      const protein = Number(f.protein) || 0;
-      const fat = Number(f.fat) || 0;
-      const sugar = Number(f.sugars) || 0;
-      return {
-        name: String(f.name || '').trim() || '음식',
-        calories,
-        nutrients: { carbs, protein, fat, sugar },
-        image: null,
-      };
-    });
-
-    const replaceExisting = !!s.replaceExisting;
-
-    setMealData((prev) => {
-      const dateStr = formatDate(scanDate);
-      const existing = prev[dateStr] || {
-        summary: { calories: 0, carbs: 0, protein: 0, fat: 0, sugar: 0 },
-        breakfast: {
-          foods: [],
-          nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 },
-          memo: '',
-        },
-        lunch: {
-          foods: [],
-          nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 },
-          memo: '',
-        },
-        dinner: {
-          foods: [],
-          nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 },
-          memo: '',
-        },
-        snack: {
-          foods: [],
-          nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 },
-          memo: '',
-        },
-      };
-      const mealKey = s.mealType;
-      const existingMeal = existing[mealKey];
-
-      const updatedFoods = replaceExisting
-        ? foodsToAdd
-        : [...(existingMeal.foods || []), ...foodsToAdd];
-
-      const newNutrients = foodsToAdd.reduce(
-        (acc, f) => ({
-          carbs: acc.carbs + (f.nutrients?.carbs || 0),
-          protein: acc.protein + (f.nutrients?.protein || 0),
-          fat: acc.fat + (f.nutrients?.fat || 0),
-          sugar: acc.sugar + (f.nutrients?.sugar || 0),
-        }),
-        { carbs: 0, protein: 0, fat: 0, sugar: 0 },
-      );
-
-      const updatedNutrients = replaceExisting
-        ? newNutrients
-        : {
-            carbs: (existingMeal.nutrients?.carbs || 0) + newNutrients.carbs,
-            protein:
-              (existingMeal.nutrients?.protein || 0) + newNutrients.protein,
-            fat: (existingMeal.nutrients?.fat || 0) + newNutrients.fat,
-            sugar: (existingMeal.nutrients?.sugar || 0) + newNutrients.sugar,
-          };
-
-      const newCal = foodsToAdd.reduce((sum, f) => sum + f.calories, 0);
-      const oldCal = replaceExisting ? getMealTotalCalories(existingMeal) : 0;
-      const oldNutrients = replaceExisting
-        ? existingMeal.nutrients || { carbs: 0, protein: 0, fat: 0, sugar: 0 }
-        : { carbs: 0, protein: 0, fat: 0, sugar: 0 };
-
-      return {
-        ...prev,
-        [dateStr]: {
-          ...existing,
-          [mealKey]: {
-            ...existingMeal,
-            foods: updatedFoods,
-            nutrients: updatedNutrients,
-            memo: replaceExisting ? '' : existingMeal.memo || '',
-          },
-          summary: {
-            ...existing.summary,
-            calories: (existing.summary?.calories || 0) - oldCal + newCal,
-            carbs:
-              (existing.summary?.carbs || 0) -
-              oldNutrients.carbs +
-              newNutrients.carbs,
-            protein:
-              (existing.summary?.protein || 0) -
-              oldNutrients.protein +
-              newNutrients.protein,
-            fat:
-              (existing.summary?.fat || 0) -
-              oldNutrients.fat +
-              newNutrients.fat,
-            sugar:
-              (existing.summary?.sugar || 0) -
-              oldNutrients.sugar +
-              newNutrients.sugar,
-          },
-        },
-      };
-    });
+    // ScanAnalysis에서 넘어온 후 해당 날짜 데이터 새로고침
+    if (user?.id) {
+      fetchDailyData(scanDate, user.id);
+    }
 
     navigate(location.pathname, { replace: true, state: {} });
-  }, []);
+  }, [user?.id]);
 
   const handleMonthChange = (delta) => {
     setCurrentMonth(
@@ -1490,111 +1366,18 @@ export default function DailyLogPage() {
 
     // 해당 날짜의 식사 기록 조회
     if (user?.id) {
-      try {
-        const dateStr = formatDate(date);
-        const response = await fetch(
-          `http://localhost:8000/api/meals?userId=${user.id}&date=${dateStr}`,
-        );
-        if (response.ok) {
-          const data = await response.json();
-          console.log('식사 기록 조회:', data);
-          // TODO: 응답 데이터를 mealData에 반영
-        }
-      } catch (error) {
-        console.error('식사 기록 조회 실패:', error);
-      }
+      await fetchDailyData(date, user.id);
     }
   };
 
-  // 음식 추가 핸들러
-  const handleAddFood = (mealKey, foods, memoText = '') => {
-    const dateStr = formatDate(selectedDate);
-
-    setMealData((prev) => {
-      const existingDayData = prev[dateStr] || {
-        summary: { calories: 0, carbs: 0, protein: 0, fat: 0, sugar: 0 },
-        breakfast: {
-          foods: [],
-          nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 },
-          memo: '',
-        },
-        lunch: {
-          foods: [],
-          nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 },
-          memo: '',
-        },
-        dinner: {
-          foods: [],
-          nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 },
-          memo: '',
-        },
-        snack: {
-          foods: [],
-          nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 },
-          memo: '',
-        },
-      };
-
-      const existingMeal = existingDayData[mealKey] || {
-        foods: [],
-        nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 },
-        memo: '',
-      };
-      const updatedFoods = [...(existingMeal.foods || []), ...foods];
-      // 메모는 새로 입력한 값이 있으면 기존 메모에 추가
-      const updatedMemo = memoText
-        ? existingMeal.memo
-          ? `${existingMeal.memo}\n${memoText}`
-          : memoText
-        : existingMeal.memo;
-
-      // 새로 추가되는 음식들의 영양소 합계 계산
-      const newNutrients = foods.reduce(
-        (acc, f) => ({
-          carbs: acc.carbs + (f.nutrients?.carbs || 0),
-          protein: acc.protein + (f.nutrients?.protein || 0),
-          fat: acc.fat + (f.nutrients?.fat || 0),
-          sugar: acc.sugar + (f.nutrients?.sugar || 0),
-        }),
-        { carbs: 0, protein: 0, fat: 0, sugar: 0 },
-      );
-
-      // 기존 영양소에 새 영양소 합산
-      const updatedNutrients = {
-        carbs: (existingMeal.nutrients?.carbs || 0) + newNutrients.carbs,
-        protein: (existingMeal.nutrients?.protein || 0) + newNutrients.protein,
-        fat: (existingMeal.nutrients?.fat || 0) + newNutrients.fat,
-        sugar: (existingMeal.nutrients?.sugar || 0) + newNutrients.sugar,
-      };
-
-      const newCalories = foods.reduce((sum, f) => sum + f.calories, 0);
-
-      return {
-        ...prev,
-        [dateStr]: {
-          ...existingDayData,
-          [mealKey]: {
-            ...existingMeal,
-            foods: updatedFoods,
-            nutrients: updatedNutrients,
-            memo: updatedMemo,
-          },
-          summary: {
-            ...existingDayData.summary,
-            calories: (existingDayData.summary?.calories || 0) + newCalories,
-            carbs: (existingDayData.summary?.carbs || 0) + newNutrients.carbs,
-            protein:
-              (existingDayData.summary?.protein || 0) + newNutrients.protein,
-            fat: (existingDayData.summary?.fat || 0) + newNutrients.fat,
-            sugar: (existingDayData.summary?.sugar || 0) + newNutrients.sugar,
-          },
-        },
-      };
-    });
+  // 저장 후 데이터 새로고침
+  const handleRefreshData = async () => {
+    if (user?.id) {
+      await fetchDailyData(selectedDate, user.id);
+    }
   };
 
   const dateStr = formatDate(selectedDate);
-  const dayData = mealData[dateStr] || null;
   const isToday = isSameDay(selectedDate, today);
 
   const totalCalories = dayData
@@ -1667,6 +1450,7 @@ export default function DailyLogPage() {
               onDateSelect={handleDateSelect}
               currentMonth={currentMonth}
               onMonthChange={handleMonthChange}
+              dayData={dayData}
             />
             <NutritionSummaryPanel date={selectedDate} data={dayData} />
           </Paper>
@@ -1767,7 +1551,7 @@ export default function DailyLogPage() {
             <Box sx={{ display: 'flex', gap: 2, mt: 1.5 }}>
               <Box sx={{ width: 20, flexShrink: 0 }} />
               <Box sx={{ flexGrow: 1 }}>
-                <AddRecordCard onSave={handleAddFood} userId={user?.id} />
+                <AddRecordCard onRefresh={handleRefreshData} userId={user?.id} />
               </Box>
             </Box>
           </Stack>
