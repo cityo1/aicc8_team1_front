@@ -8,7 +8,7 @@ const Layout = () => {
       <Sidebar />
 
       <main className="flex-1 min-w-0 pl-72 pt-8 pr-8 pb-8 text-var(--color-text)">
-        <div className="w-full max-w-8xl">
+        <div className="w-full">
           <Outlet />
         </div>
       </main>
