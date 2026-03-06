@@ -109,18 +109,26 @@ function getMealTotalCalories(meal) {
 function transformApiResponse(apiData) {
   if (!apiData || !apiData.success) return null;
 
-  const transformMeal = (meal) => ({
-    foods: (meal.foods || []).map((f) => ({
-      id: f.id,
-      name: f.foodName || '알 수 없는 음식',
-      calories: f.calories || 0,
-      nutrients: f.nutrients || { carbs: 0, protein: 0, fat: 0, sugar: 0 },
-      image: f.imageUrl || null,
-      memo: f.memo || null,
-    })),
-    nutrients: meal.nutrients || { carbs: 0, protein: 0, fat: 0, sugar: 0 },
-    memo: '',
-  });
+  const transformMeal = (meal) => {
+    const foods = meal.foods || [];
+    // 모든 음식의 메모를 수집 (중복 제거, 빈 값 제외)
+    const allMemos = foods
+      .map((f) => f.memo)
+      .filter((memo) => memo && memo.trim())
+      .filter((memo, index, arr) => arr.indexOf(memo) === index); // 중복 제거
+
+    return {
+      foods: foods.map((f) => ({
+        id: f.id,
+        name: f.foodName || '알 수 없는 음식',
+        calories: f.calories || 0,
+        nutrients: f.nutrients || { carbs: 0, protein: 0, fat: 0, sugar: 0 },
+        image: f.imageUrl || null,
+      })),
+      nutrients: meal.nutrients || { carbs: 0, protein: 0, fat: 0, sugar: 0 },
+      memos: allMemos, // 메모 배열로 저장
+    };
+  };
 
   return {
     summary: apiData.summary || { calories: 0, carbs: 0, protein: 0, fat: 0, sugar: 0 },
@@ -164,14 +172,11 @@ function NutrientBar({ label, value, daily, color }) {
 // ─── 식사 카드 ────────────────────────────────────────────────────────────────
 function MealCard({ meal, data, isToday, dateStr, scanImage, scanMealType }) {
   const [open, setOpen] = useState(false);
-  const [memo, setMemo] = useState(data?.memo || '');
   const totalCal = getMealTotalCalories(data);
   const { Icon, color, bg, darkColor } = meal;
 
-  // data.memo가 변경되면 memo state 동기화
-  useEffect(() => {
-    setMemo(data?.memo || '');
-  }, [data?.memo]);
+  // 저장된 메모 배열
+  const savedMemos = data?.memos || [];
 
   // 음식 중 사진이 있는 항목들 필터링
   const foodsWithImages = data?.foods?.filter((f) => f.image) || [];
@@ -460,35 +465,54 @@ function MealCard({ meal, data, isToday, dateStr, scanImage, scanMealType }) {
           >
             메모
           </Typography>
-          <TextField
-            fullWidth
-            multiline
-            rows={2}
-            placeholder="식사에 대한 메모를 남겨보세요..."
-            value={memo}
-            onChange={(e) => setMemo(e.target.value)}
-            size="small"
-            InputProps={{
-              startAdornment: (
-                <EditNote
-                  sx={{
-                    color: 'text.disabled',
-                    mr: 1,
-                    mt: '2px',
-                    alignSelf: 'flex-start',
-                    fontSize: 20,
-                  }}
-                />
-              ),
-            }}
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                fontSize: '0.875rem',
+          {savedMemos.length > 0 ? (
+            <Box
+              sx={{
                 bgcolor: '#f8fafc',
                 borderRadius: 2,
-              },
-            }}
-          />
+                p: 1.5,
+                border: '1px solid #e8ecf0',
+              }}
+            >
+              {savedMemos.map((memoText, idx) => (
+                <Box
+                  key={idx}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 1,
+                    py: 0.5,
+                    mt: idx > 0 ? '6px' : 0,
+                    borderBottom:
+                      idx < savedMemos.length - 1
+                        ? '1px dashed #e2e8f0'
+                        : 'none',
+                  }}
+                >
+                  <EditNote
+                    sx={{ fontSize: 18, color: color, mt: '2px', flexShrink: 0 }}
+                  />
+                  <Typography variant="body2" color="text.secondary">
+                    {memoText}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          ) : (
+            <Box
+              sx={{
+                bgcolor: '#f8fafc',
+                borderRadius: 2,
+                p: 2,
+                textAlign: 'center',
+                border: '1px dashed #e2e8f0',
+              }}
+            >
+              <Typography variant="body2" color="text.disabled">
+                저장된 메모가 없습니다.
+              </Typography>
+            </Box>
+          )}
         </Box>
       </Collapse>
     </Paper>
