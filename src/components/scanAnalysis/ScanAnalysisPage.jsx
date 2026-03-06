@@ -35,6 +35,7 @@ const App = () => {
   const [error, setError] = useState(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [imageRect, setImageRect] = useState(null); // { left, top, width, height } px, 컨테이너 기준
+  const [mealType, setMealType] = useState('breakfast');
   const fileInputRef = useRef(null);
   const imgContainerRef = useRef(null);
   const imgRef = useRef(null);
@@ -654,6 +655,34 @@ const App = () => {
                 )}
               </div>
 
+              {/* 식사 구분 (아침/점심/저녁/간식 선택) */}
+              <div className="bg-white rounded-3xl p-4 shadow-sm border border-slate-100">
+                <p className="text-xs font-bold text-[#1E2923]/60 uppercase mb-3">
+                  식사 구분
+                </p>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { value: 'breakfast', label: '아침' },
+                    { value: 'lunch', label: '점심' },
+                    { value: 'dinner', label: '저녁' },
+                    { value: 'snack', label: '간식' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setMealType(opt.value)}
+                      className={`py-3 px-3 rounded-xl font-bold text-sm transition-all ${
+                        mealType === opt.value
+                          ? 'bg-[#FF8243] text-white shadow-md ring-2 ring-[#FF8243]/40'
+                          : 'bg-slate-100 text-[#1E2923]/70 hover:bg-slate-200'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <button
                   onClick={resetScanner}
@@ -663,7 +692,34 @@ const App = () => {
                 </button>
                 <button
                   className="bg-[#1E2923] text-white py-5 rounded-3xl font-bold flex items-center justify-center gap-2 hover:bg-[#2a3a31] transition-all shadow-lg active:scale-95"
-                  onClick={() => navigate('/home/dailyLog')}
+                  onClick={() => {
+                    const totals =
+                      computedTotals ?? {
+                        calories: analysis.calories,
+                        carbs: analysis.macros?.carbs ?? 0,
+                        sugar: analysis.macros?.sugar ?? 0,
+                        protein: analysis.macros?.protein ?? 0,
+                        fat: analysis.macros?.fat ?? 0,
+                      };
+                    const dt = new Date();
+                    const mealTime = dt.toISOString();
+                    navigate('/home/dailyLog', {
+                      state: {
+                        fromScan: true,
+                        mealType,
+                        mealTime,
+                        date: dt.toISOString().slice(0, 10),
+                        image: selectedImage,
+                        foods: analysis.rawFoods.map((f, i) => ({
+                          ...f,
+                          name: appliedFoods[i]?.name ?? f.name,
+                          amount: appliedFoods[i]?.amount ?? f.amount,
+                        })),
+                        totalCalories: totals?.calories ?? analysis.calories,
+                        totals,
+                      },
+                    });
+                  }}
                 >
                   기록하기 <ChevronRight size={20} />
                 </button>
