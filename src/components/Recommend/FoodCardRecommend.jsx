@@ -1,12 +1,14 @@
 import React from 'react';
-import { FaStar } from 'react-icons/fa';
+import { FaStar, FaCheckSquare, FaRegCheckSquare } from 'react-icons/fa';
 import { TbTrashX } from 'react-icons/tb';
 
 /**
  * @param {Object} food - 음식 데이터 객체
- * @param {boolean} isFavorite - 현재 이 음식이 즐겨찾기 상태인지 여부
- * @param {function} onToggleFavorite - 즐겨찾기 버튼 클릭 시 실행할 함수
- * @param {function} onDelete - 삭제 버튼 클릭 시 실행할 함수
+ * @param {boolean} isFavorite - 즐겨찾기 상태
+ * @param {boolean} isChecked - 체크박스 선택 상태 (추가)
+ * @param {function} onToggleFavorite - 즐겨찾기 토글 함수
+ * @param {function} onToggleCheck - 체크박스 토글 함수 (추가)
+ * @param {function} onDelete - 삭제 함수
  */
 
 const FoodCardRecommend = ({
@@ -14,6 +16,8 @@ const FoodCardRecommend = ({
   isFavorite,
   onToggleFavorite,
   onDelete,
+  isChecked,
+  onToggleCheck,
 }) => {
   return (
     <div className="bg-white rounded-2xl p-3 border border-gray-100 shadow-sm relative flex flex-col group hover:shadow-md transition-shadow duration-200">
@@ -28,9 +32,26 @@ const FoodCardRecommend = ({
 
       {/* 텍스트 정보 섹션 */}
       <div className="flex-1 flex flex-col">
-        <h3 className="font-bold text-[15px] text-[#1E2923] mb-1 truncate">
-          {food.name}
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-[15px] text-[#1E2923] mb-1 truncate">
+            {food.name}
+          </h3>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={(e) => {
+                e.stopPropagation(); // 카드 클릭 이벤트와 분리
+                onToggleCheck();
+              }}
+              className="text-[#FF8243] cursor-pointer"
+            >
+              {isChecked ? (
+                <FaCheckSquare size={18} color="#FF8243" />
+              ) : (
+                <FaRegCheckSquare size={18} color="#6a7282" />
+              )}
+            </button>
+          </div>
+        </div>
 
         <p className="text-[13px] text-gray-500 line-clamp-3 leading-relaxed mb-3 h-13">
           {food.description}
@@ -44,7 +65,7 @@ const FoodCardRecommend = ({
           className="absolute top-2 right-2 p-1.5 bg-white/90 backdrop-blur-sm rounded-full shadow-sm hover:bg-white transition-colors"
         >
           <FaStar
-            size={17}
+            size={19}
             className={`transition-colors duration-200 ${
               isFavorite ? 'text-[#FF8243]' : 'text-gray-300'
             }`}
@@ -84,7 +105,7 @@ const FoodCardRecommend = ({
             className="text-gray-400 hover:text-gray-700 transition-colors duration-200"
             title="삭제"
           >
-            <TbTrashX size={17} />
+            <TbTrashX size={20} />
           </button>
         </div>
       </div>

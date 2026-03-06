@@ -1,7 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import FoodCardRecommend from './FoodCardRecommend';
-import { FaStar, FaSearch } from 'react-icons/fa';
+import {
+  FaStar,
+  FaSearch,
+  FaRegCheckSquare,
+  FaCheckSquare,
+} from 'react-icons/fa';
 import { TbMessageChatbot } from 'react-icons/tb';
+import { IoMdRefresh } from 'react-icons/io';
+import { LuPanelTopOpen } from 'react-icons/lu';
+
 import OpenAI from 'openai';
 
 // 1. OpenAI 설정 (Vite 환경 변수 사용)
@@ -22,7 +30,7 @@ const RecommendPage = () => {
     },
     {
       id: 2,
-      name: '당근 쿠키',
+      name: '퀴노아 샐러드',
       description: '채소로 만든 건강한 디저트',
       tags: ['다이어트', '비건'],
       image: 'https://via.placeholder.com/150',
@@ -93,10 +101,11 @@ const RecommendPage = () => {
             5. 한 번에 3~5개의 메뉴를 추천하세요.
             6. 추천된 메뉴는 중복되지 않도록 하세요.
             7. 없는 식단을 만들어내거나 
-            8. 텍스트 답변에서는 특수문자 *, &, ^, %, $, # ,@를 출력하지 마세요.
+            8. 텍스트 답변에서는 특수문자 *, &, ^, %, $, #, @, ;를 출력하지 마세요.
             9. 답변 양식은 아래와 같습니다
               간단한 설명
-              번호. 추천 메뉴의 이름: 추천 이유`,
+              번호를 적은 후 추천 메뉴의 이름과 추천 이유를 콜론(:)으로 구분하세요.
+              오른쪽 추천메뉴 카드들 확인 권유`,
           },
           ...messages.filter((m) => m.role !== 'system'),
           userMsg,
@@ -116,14 +125,36 @@ const RecommendPage = () => {
       if (jsonMatch) {
         try {
           const rawNewFoods = JSON.parse(jsonMatch[1]);
-          const newFoodsWithId = rawNewFoods.map((food, index) => ({
-            ...food,
-            id: Date.now() + index, // 고유 ID 부여
-            image: 'https://via.placeholder.com/150', // 기본 이미지 설정
-          }));
 
-          // 3. 신규 음식을 리스트 상단에 추가
-          setRecommendedFoods((prev) => [...newFoodsWithId, ...prev]);
+          setRecommendedFoods((prev) => {
+            let updatedList = [...prev];
+            [...rawNewFoods].reverse().forEach((newFood) => {
+              const newNameClean = newFood.name.replace(/\s+/g, '');
+
+              // 기존 리스트에 같은 이름이 있는지 확인
+              const existingIndex = updatedList.findIndex(
+                (f) => f.name.replace(/\s+/g, '') === newNameClean,
+              );
+
+              if (existingIndex !== -1) {
+                // 이미 있다면 해당 항목을 추출해서 맨 앞으로 이동
+                const [existingItem] = updatedList.splice(existingIndex, 1);
+                updatedList.unshift({
+                  ...existingItem,
+                  description: newFood.description,
+                });
+              } else {
+                // 없다면 새 ID를 부여해서 맨 앞에 추가
+                updatedList.unshift({
+                  ...newFood,
+                  id: Date.now() + Math.random(),
+                  image: 'https://via.placeholder.com/150',
+                });
+              }
+            });
+
+            return updatedList;
+          });
         } catch (error) {
           console.error('JSON 파싱 실패:', error);
         }
@@ -179,6 +210,26 @@ const RecommendPage = () => {
     );
   };
 
+  const resetFilters = () => {
+    triggerLoading();
+    setSearchTerm('');
+    setFinalSearchTerm('');
+    setSelectedTags([]);
+    setIsFavoriteView(false);
+  };
+
+  const [sortType, setSortType] = useState('latest');
+
+  // 체크박스 상태
+  const [checkedItems, setCheckedItems] = useState([]);
+  const toggleCheck = (id) => {
+    setCheckedItems((prev) =>
+      prev.includes(id)
+        ? prev.filter((itemId) => itemId !== id)
+        : [...prev, id],
+    );
+  };
+
   // 삭제된 데이터를 임시 보관할 Ref (재렌더링 방지)
   const deletedFoodRef = useRef(null);
   const toastTimerRef = useRef(null);
@@ -226,16 +277,25 @@ const RecommendPage = () => {
   };
 
   // 필터링된 결과 (상태 기반)
-  const displayFoods = recommendedFoods.filter((food) => {
-    const matchesSearch = food.name
-      .toLowerCase()
-      .includes(finalSearchTerm.toLowerCase());
-    const matchesTags =
-      selectedTags.length === 0 ||
-      selectedTags.every((tag) => food.tags.includes(tag));
-    const matchesFavorite = isFavoriteView ? favorites.includes(food.id) : true;
-    return matchesSearch && matchesTags && matchesFavorite;
-  });
+  const displayFoods = recommendedFoods
+    .filter((food) => {
+      const matchesSearch = food.name
+        .toLowerCase()
+        .includes(finalSearchTerm.toLowerCase());
+      const matchesTags =
+        selectedTags.length === 0 ||
+        selectedTags.every((tag) => food.tags.includes(tag));
+      const matchesFavorite = isFavoriteView
+        ? favorites.includes(food.id)
+        : true;
+      return matchesSearch && matchesTags && matchesFavorite;
+    })
+    .sort((a, b) => {
+      if (sortType === 'name') {
+        return a.name.localeCompare(b.name, 'ko');
+      }
+      return b.id - a.id;
+    });
 
   return (
     <div className="flex p-4 gap-4 text-[#1E2923] bg-gray-50 h-[92vh] max-h-[1000px] overflow-hidden">
@@ -274,7 +334,7 @@ const RecommendPage = () => {
             </div>
           ))}
           {isLoading && (
-            <div className="text-xs text-gray-400 animate-pulse ml-2">
+            <div className="p-3 px-4 rounded-2xl shadow-sm text-sm whitespace-pre-wrap bg-white border border-gray-100 rounded-tl-none text-gray-400 animate-pulse ml-2">
               답변 생성 중 ...
             </div>
           )}
@@ -331,24 +391,49 @@ const RecommendPage = () => {
               />
             </button>
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
-            {filterTags.map((label) => (
-              <button
-                key={label}
-                onClick={() => handleFilter(label)}
-                className={`whitespace-nowrap px-3 py-1.5 rounded-full border text-[14px] font-medium transition-all ${
-                  selectedTags.includes(label)
-                    ? 'bg-[#FF8243] text-white border-[#FF8243]'
-                    : 'bg-white text-gray-600 border-gray-200'
-                }`}
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={resetFilters}
+              className="p-2 bg-white border border-gray-200 rounded-lg shadow-sm hover:text-[#FF8243] transition-colors shrink-0"
+              title="필터 초기화"
+            >
+              <IoMdRefresh size={20} />
+            </button>
+            <div className="flex-1 flex gap-1 overflow-x-auto pb-1 custom-scrollbar">
+              {filterTags.map((label) => (
+                <button
+                  key={label}
+                  onClick={() => handleFilter(label)}
+                  className={`whitespace-nowrap px-2.5 py-1.5 rounded-full border text-[12.5px] font-medium transition-all ${
+                    selectedTags.includes(label)
+                      ? 'bg-[#FF8243] text-white border-[#FF8243]'
+                      : 'bg-white text-gray-600 border-gray-200'
+                  }`}
+                >
+                  #{label}
+                </button>
+              ))}
+            </div>
+            <div className="relative shrink-0">
+              <select
+                value={sortType}
+                onChange={(e) => setSortType(e.target.value)}
+                className="appearance-none pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded-lg text-[13px] font-medium focus:outline-none cursor-pointer hover:border-gray-300"
               >
-                #{label}
-              </button>
-            ))}
+                <option value="latest">최신순</option>
+                <option value="oldest">오래된순</option>
+                <option value="name">이름순(ㄱ~ㅎ)</option>
+                <option value="namereverse">이름순(ㅎ~ㄱ)</option>
+              </select>
+              <div className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                <LuPanelTopOpen size={20} />
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar relative">
+        <div className="flex-1 bg-[#F9FBFA] overflow-y-auto pr-1 custom-scrollbar relative ">
           {isDataLoading ? (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-50/50 z-10">
               <div className="w-8 h-8 border-4 border-[#FF8243] border-t-transparent rounded-full animate-spin"></div>
@@ -362,12 +447,18 @@ const RecommendPage = () => {
                   isFavorite={favorites.includes(food.id)}
                   onToggleFavorite={() => toggleFavorite(food.id)}
                   onDelete={() => handleDelete(food.id, food.name)}
+                  isChecked={checkedItems.includes(food.id)} // 체크 상태 전달
+                  onToggleCheck={() => toggleCheck(food.id)} // 토글 함수 전달
                 />
               ))}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-20 text-gray-400 bg-white rounded-2xl border border-dashed border-gray-200">
-              <p className="text-sm">해당하는 식단이 없습니다.</p>
+              <p className="text-sm font-medium">
+                {isFavoriteView
+                  ? '즐겨찾기한 식단이 없습니다.'
+                  : '검색 결과가 없습니다.'}
+              </p>
               <button
                 onClick={() => {
                   triggerLoading();
@@ -385,7 +476,7 @@ const RecommendPage = () => {
         </div>
         {toast.visible && (
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 animate-toast-bottom">
-            <div className="bg-[#1E2923]/85 backdrop-blur-sm text-white px-5 py-3 rounded-2xl flex items-center gap-4 border border-white/10 min-w-[400px] justify-between">
+            <div className="bg-[#1E2923]/85 backdrop-blur-sm text-white px-5 py-3 rounded-2xl flex items-center gap-4 border border-white/10 min-w-[420px] justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-2 h-2 bg-[#FF8243] rounded-full"></div>
                 <span className="text-sm font-medium pl-1">

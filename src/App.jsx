@@ -23,8 +23,7 @@ function App() {
           {/* 인증 페이지 (Layout 없이 전체 화면) */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage
-          />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
           {/* 메인 앱 (Layout 포함) */}
           <Route path="/home" element={<Layout />}>
