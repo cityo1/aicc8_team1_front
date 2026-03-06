@@ -133,7 +133,7 @@ const ReportPage = () => {
             <div className="bg-white flex justify-between items-center p-6 rounded-xl shadow-sm border-l-8 border-[#FF8243]">
               <h2 className="font-semibold text-gray-700 text-lg flex-shrink-0 mr-4">
                 <span className="text-gray-900 font-bold">홍길동</span> 님의
-                영양 점수는{' '}
+                주간 영양 점수는{' '}
                 <span className="text-[#FF8243] font-bold text-[22px]">
                   85점
                 </span>{' '}
