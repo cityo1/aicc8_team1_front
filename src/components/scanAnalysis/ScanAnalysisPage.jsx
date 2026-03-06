@@ -15,6 +15,14 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Button,
+} from '@mui/material';
 import { analyzeFoodImage, reanalyzeFood } from '../../api/scan';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -36,6 +44,8 @@ const App = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [imageRect, setImageRect] = useState(null); // { left, top, width, height } px, 컨테이너 기준
   const [mealType, setMealType] = useState('breakfast');
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const confirmNavigateRef = useRef(null);
   const fileInputRef = useRef(null);
   const imgContainerRef = useRef(null);
   const imgRef = useRef(null);
@@ -505,7 +515,9 @@ const App = () => {
                                     placeholder="0"
                                     className="w-14 text-right bg-transparent border-b border-transparent hover:border-[#1E2923]/20 focus:border-[#FF8243] focus:outline-none py-1 text-[#1E2923] font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                   />
-                                  <span className="text-[#1E2923]/70 font-medium text-sm">g</span>
+                                  <span className="text-[#1E2923]/70 font-medium text-sm">
+                                    g
+                                  </span>
                                 </div>
                               </td>
                               <td className="py-2 px-2 text-right">
@@ -693,15 +705,34 @@ const App = () => {
                 <button
                   className="bg-[#1E2923] text-white py-5 rounded-3xl font-bold flex items-center justify-center gap-2 hover:bg-[#2a3a31] transition-all shadow-lg active:scale-95"
                   onClick={() => {
-                    const totals =
-                      computedTotals ?? {
-                        calories: analysis.calories,
-                        carbs: analysis.macros?.carbs ?? 0,
-                        sugar: analysis.macros?.sugar ?? 0,
-                        protein: analysis.macros?.protein ?? 0,
-                        fat: analysis.macros?.fat ?? 0,
-                      };
                     const dt = new Date();
+                    const dateStr = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+
+                    let replaceExisting = false;
+                    try {
+                      const stored = localStorage.getItem('dailyLogData');
+                      if (stored) {
+                        const parsed = JSON.parse(stored);
+                        const existingMeal = parsed[dateStr]?.[mealType];
+                        if (existingMeal?.foods?.length > 0) {
+                          replaceExisting = true;
+                          confirmNavigateRef.current = {
+                            dt,
+                            replaceExisting,
+                          };
+                          setConfirmOpen(true);
+                          return;
+                        }
+                      }
+                    } catch (e) {}
+
+                    const totals = computedTotals ?? {
+                      calories: analysis.calories,
+                      carbs: analysis.macros?.carbs ?? 0,
+                      sugar: analysis.macros?.sugar ?? 0,
+                      protein: analysis.macros?.protein ?? 0,
+                      fat: analysis.macros?.fat ?? 0,
+                    };
                     const mealTime = dt.toISOString();
                     navigate('/home/dailyLog', {
                       state: {
@@ -710,6 +741,7 @@ const App = () => {
                         mealTime,
                         date: dt.toISOString().slice(0, 10),
                         image: selectedImage,
+                        replaceExisting: false,
                         foods: analysis.rawFoods.map((f, i) => ({
                           ...f,
                           name: appliedFoods[i]?.name ?? f.name,
@@ -732,6 +764,101 @@ const App = () => {
       <footer className="py-6 text-center text-[#1E2923]/40 text-sm font-medium tracking-tight">
         Powered by Advanced AI Recognition
       </footer>
+
+      <Dialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            minWidth: 320,
+            maxWidth: 400,
+            mx: 2,
+          },
+        }}
+        sx={{
+          '& .MuiBackdrop-root': { bgcolor: 'rgba(0,0,0,0.4)' },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            fontWeight: 700,
+            fontSize: '1.1rem',
+            textAlign: 'center',
+            pt: 3,
+          }}
+        >
+          기존 기록이 있습니다
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText
+            sx={{
+              textAlign: 'center',
+              fontSize: '0.95rem',
+              color: 'text.secondary',
+              lineHeight: 1.6,
+            }}
+          >
+            새로 입력한 내용으로 바꾸시겠습니까?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', gap: 1, pb: 3, px: 3 }}>
+          <Button
+            onClick={() => setConfirmOpen(false)}
+            variant="outlined"
+            sx={{
+              borderRadius: 2,
+              borderColor: '#e2e8f0',
+              color: 'text.secondary',
+              px: 3,
+            }}
+          >
+            취소
+          </Button>
+          <Button
+            onClick={() => {
+              setConfirmOpen(false);
+              const ref = confirmNavigateRef.current;
+              if (!ref || !analysis) return;
+              const { dt, replaceExisting } = ref;
+              confirmNavigateRef.current = null;
+              const totals = computedTotals ?? {
+                calories: analysis.calories,
+                carbs: analysis.macros?.carbs ?? 0,
+                sugar: analysis.macros?.sugar ?? 0,
+                protein: analysis.macros?.protein ?? 0,
+                fat: analysis.macros?.fat ?? 0,
+              };
+              navigate('/home/dailyLog', {
+                state: {
+                  fromScan: true,
+                  mealType,
+                  mealTime: dt.toISOString(),
+                  date: dt.toISOString().slice(0, 10),
+                  image: selectedImage,
+                  replaceExisting,
+                  foods: analysis.rawFoods.map((f, i) => ({
+                    ...f,
+                    name: appliedFoods[i]?.name ?? f.name,
+                    amount: appliedFoods[i]?.amount ?? f.amount,
+                  })),
+                  totalCalories: totals?.calories ?? analysis.calories,
+                  totals,
+                },
+              });
+            }}
+            variant="contained"
+            sx={{
+              borderRadius: 2,
+              bgcolor: '#FF8243',
+              px: 3,
+              '&:hover': { bgcolor: '#E05A1F' },
+            }}
+          >
+            확인
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };
