@@ -87,3 +87,85 @@ export function buildUserForScore(userProfile) {
   const weight = Number(userProfile.weight) || defaults.weight;
   return { age, gender: gender === 'female' ? 'female' : 'male', height, weight };
 }
+
+/**
+ * 사용자 프로필 기반 일일 권장 섭취량 계산
+ * @param {Object} userProfile - { age, ageGroup, gender, height, weight }
+ * @returns {{ calories: number, carbs: number, protein: number, fat: number, sugar: number }}
+ */
+export function calculateDailyTargets(userProfile) {
+  const user = buildUserForScore(userProfile);
+
+  // BMR 계산 (Mifflin-St Jeor 공식)
+  let bmr;
+  if (user.gender === 'male') {
+    bmr = 10 * user.weight + 6.25 * user.height - 5 * user.age + 5;
+  } else {
+    bmr = 10 * user.weight + 6.25 * user.height - 5 * user.age - 161;
+  }
+
+  // 일일 칼로리 (활동계수 1.4 적용)
+  const dailyCalories = bmr * 1.4;
+
+  return {
+    calories: Math.round(dailyCalories),
+    carbs: Math.round((dailyCalories * 0.5) / 4),      // 탄수화물 50%, 1g=4kcal
+    protein: Math.round((dailyCalories * 0.2) / 4),    // 단백질 20%, 1g=4kcal
+    fat: Math.round((dailyCalories * 0.3) / 9),        // 지방 30%, 1g=9kcal
+    sugar: Math.round((dailyCalories * 0.1) / 4),      // 당류 10% 미만 권고
+  };
+}
+
+// 목표에 따른 식사별 배분 비율
+const MEAL_RATIOS = {
+  default:   { breakfast: 0.25, lunch: 0.35, dinner: 0.30, snack: 0.10 },
+  weight:    { breakfast: 0.30, lunch: 0.35, dinner: 0.25, snack: 0.10 }, // 체중관리: 저녁 줄임
+  muscle:    { breakfast: 0.25, lunch: 0.30, dinner: 0.35, snack: 0.10 }, // 근육증가: 저녁 증가
+  nutrition: { breakfast: 0.30, lunch: 0.30, dinner: 0.30, snack: 0.10 }, // 영양균형: 균등
+  condition: { breakfast: 0.35, lunch: 0.35, dinner: 0.20, snack: 0.10 }, // 컨디션: 아침 강화
+};
+
+/**
+ * 사용자 목표에 따른 식사별 배분 비율 반환
+ * @param {string[]} goals - 사용자 목표 배열 ['weight', 'muscle', ...]
+ * @returns {{ breakfast: number, lunch: number, dinner: number, snack: number }}
+ */
+export function getMealRatios(goals) {
+  if (!goals || goals.length === 0) {
+    return MEAL_RATIOS.default;
+  }
+  // 첫 번째 목표를 기준으로 배분 (우선순위: weight > muscle > condition > nutrition)
+  const priority = ['weight', 'muscle', 'condition', 'nutrition'];
+  for (const goal of priority) {
+    if (goals.includes(goal)) {
+      return MEAL_RATIOS[goal];
+    }
+  }
+  return MEAL_RATIOS.default;
+}
+
+/**
+ * 사용자 프로필 기반 식사별 권장 섭취량 계산
+ * @param {Object} userProfile - { age, ageGroup, gender, height, weight, goals }
+ * @returns {{ breakfast: Object, lunch: Object, dinner: Object, snack: Object }}
+ */
+export function calculateMealTargets(userProfile) {
+  const dailyTargets = calculateDailyTargets(userProfile);
+  const goals = userProfile?.goals || [];
+  const ratios = getMealRatios(goals);
+
+  const applyRatio = (ratio) => ({
+    calories: Math.round(dailyTargets.calories * ratio),
+    carbs: Math.round(dailyTargets.carbs * ratio),
+    protein: Math.round(dailyTargets.protein * ratio),
+    fat: Math.round(dailyTargets.fat * ratio),
+    sugar: Math.round(dailyTargets.sugar * ratio),
+  });
+
+  return {
+    breakfast: applyRatio(ratios.breakfast),
+    lunch: applyRatio(ratios.lunch),
+    dinner: applyRatio(ratios.dinner),
+    snack: applyRatio(ratios.snack),
+  };
+}

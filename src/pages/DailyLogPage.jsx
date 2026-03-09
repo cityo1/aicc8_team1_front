@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import {
     Box,
@@ -38,6 +38,8 @@ import {
 } from '@mui/icons-material';
 import FoodSearchInput from '../components/search/FoodSearchInput';
 import { useAuth } from '../contexts/AuthContext';
+import { useProfile } from '../contexts/ProfileContext';
+import { calculateMealTargets } from '../components/common/calculateNutritionScore';
 
 // ─── API 기본 URL ──────────────────────────────────────────────────────────
 const API_BASE_URL = 'http://localhost:8000';
@@ -78,7 +80,8 @@ const MEALS = [
     },
 ];
 
-const NUTRIENT_CONFIG = [
+// 기본 영양소 설정 (프로필 정보가 없을 때 사용하는 기본값)
+const DEFAULT_NUTRIENT_CONFIG = [
     { key: 'carbs', label: '탄수화물', color: '#FFA726', daily: 300 },
     { key: 'protein', label: '단백질', color: '#66BB6A', daily: 60 },
     { key: 'fat', label: '지방', color: '#EF5350', daily: 65 },
@@ -180,7 +183,7 @@ function NutrientBar({ label, value, daily, color }) {
 }
 
 // ─── 식사 카드 ────────────────────────────────────────────────────────────────
-function MealCard({ meal, data, isToday, dateStr }) {
+function MealCard({ meal, data, isToday, dateStr, nutrientConfig }) {
     const [open, setOpen] = useState(false);
     const totalCal = getMealTotalCalories(data);
     const { Icon, color, bg, darkColor } = meal;
@@ -427,7 +430,7 @@ function MealCard({ meal, data, isToday, dateStr }) {
                                 영양소
                             </Typography>
                             <Stack spacing={1.2} mb={2}>
-                                {NUTRIENT_CONFIG.map((n) => (
+                                {nutrientConfig.map((n) => (
                                     <NutrientBar
                                         key={n.key}
                                         label={n.label}
@@ -637,7 +640,7 @@ function AddRecordCard({ onRefresh, userId }) {
                     });
 
                     const data = await response.json();
-                    console.log('API 응답:', response.status, data);
+                    // console.log('API 응답:', response.status, data);
 
                     if (!response.ok) {
                         throw new Error(data.message || `HTTP ${response.status}`);
@@ -646,7 +649,7 @@ function AddRecordCard({ onRefresh, userId }) {
                 }),
             );
 
-            console.log('저장 완료:', results);
+            // console.log('저장 완료:', results);
 
             // 저장 성공 후 데이터 새로고침
             if (onRefresh) {
@@ -1298,6 +1301,22 @@ function NutritionSummaryPanel({ date, data }) {
 // ─── 메인 페이지 ──────────────────────────────────────────────────────────────
 export default function DailyLogPage() {
     const { user } = useAuth();
+    const { profile } = useProfile();
+
+    // 사용자 프로필 기반 식사별 동적 영양소 권장량 계산
+    const mealTargets = useMemo(() => calculateMealTargets(profile), [profile]);
+
+    // 식사 종류별 영양소 설정 생성 함수
+    const getNutrientConfig = (mealKey) => {
+        const targets = mealTargets[mealKey] || mealTargets.breakfast;
+        return [
+            { key: 'carbs', label: '탄수화물', color: '#FFA726', daily: targets.carbs },
+            { key: 'protein', label: '단백질', color: '#66BB6A', daily: targets.protein },
+            { key: 'fat', label: '지방', color: '#EF5350', daily: targets.fat },
+            { key: 'sugar', label: '당류', color: '#AB47BC', daily: targets.sugar },
+        ];
+    };
+
     const today = new Date();
     const [selectedDate, setSelectedDate] = useState(today);
     const [currentMonth, setCurrentMonth] = useState(
@@ -1551,6 +1570,7 @@ export default function DailyLogPage() {
                                         data={dayData?.[meal.key]}
                                         isToday={isToday}
                                         dateStr={dateStr}
+                                        nutrientConfig={getNutrientConfig(meal.key)}
                                     />
                                 </Box>
                             </Box>
