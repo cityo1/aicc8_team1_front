@@ -1,11 +1,23 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { NutrientRadarChart, WeeklyLineChart } from './ReportCharts';
 import { PiChefHat } from 'react-icons/pi';
 import FoodCardRecommend from '../Recommend/FoodCardRecommend';
+import ReportCards from './ReportCards';
 
 const ReportPage = () => {
+  const [nutritionData] = useState({
+    excess: [
+      { id: 1, name: '나트륨', amount: '1,200mg', percentage: 160 },
+      { id: 2, name: '당류', amount: '15g', percentage: 125 },
+    ],
+    deficiency: [
+      { id: 3, name: '비타민 D', amount: '8μg', percentage: 35 },
+      { id: 4, name: '칼슘', amount: '250mg', percentage: 60 },
+    ],
+  });
+
   const reportRef = useRef(null);
 
   // 샘플 데이터
@@ -166,19 +178,13 @@ const ReportPage = () => {
                 </h3>
                 <NutrientRadarChart data={radarData} />
               </div>
-              <div className="col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="font-bold mb-5 text-gray-800 border-b pb-2">
-                  과잉/부족 영양소
+
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
+                <h3 className="font-bold mb-4 text-gray-800 border-b pb-3">
+                  과잉/결핍 영양소
                 </h3>
-                <div className="grid grid-rows-2 gap-3">
-                  <div className="row-span-1 flex items-center justify-center">
-                    <h3 className="">과잉 영양소</h3>
-                    <div></div>
-                  </div>
-                  <div className="row-span-1 flex items-center justify-center">
-                    <h3 className="">부족 영양소</h3>
-                    <div></div>
-                  </div>
+                <div className="flex-1">
+                  <ReportCards nutritionData={nutritionData} />
                 </div>
               </div>
             </div>
@@ -191,7 +197,6 @@ const ReportPage = () => {
               <WeeklyLineChart data={lineData} />
             </div>
           </div>
-
           {/* AI 리뷰 */}
           <div className="col-span-1 bg-white p-8 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
             <h3 className="font-bold text-xl mb-6 flex items-center text-gray-800">
