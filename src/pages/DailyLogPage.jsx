@@ -109,6 +109,16 @@ function getMealTotalCalories(meal) {
 function transformApiResponse(apiData) {
     if (!apiData || !apiData.success) return null;
 
+    // 이미지 URL 변환 함수
+    const getFullImageUrl = (imageUrl) => {
+        if (!imageUrl) return null;
+        // 이미 전체 URL인 경우 그대로 반환
+        if (imageUrl.startsWith('http')) return imageUrl;
+        // 상대 경로인 경우 API_BASE_URL 추가
+        const path = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
+        return `${API_BASE_URL}${path}`;
+    };
+
     const transformMeal = (meal) => {
         const foods = meal.foods || [];
         // 모든 음식의 메모를 수집 (중복 제거, 빈 값 제외)
@@ -123,7 +133,7 @@ function transformApiResponse(apiData) {
                 name: f.foodName || '알 수 없는 음식',
                 calories: f.calories || 0,
                 nutrients: f.nutrients || { carbs: 0, protein: 0, fat: 0, sugar: 0 },
-                image: f.imageUrl || null,
+                image: getFullImageUrl(f.imageUrl),
             })),
             nutrients: meal.nutrients || { carbs: 0, protein: 0, fat: 0, sugar: 0 },
             memos: allMemos, // 메모 배열로 저장
@@ -499,7 +509,8 @@ const EMPTY_FOOD = () => ({
     calories: '',
     foodCode: '',
     nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 },
-    image: null,
+    image: null,      // 미리보기용 base64
+    imageFile: null,  // 서버 전송용 File 객체
 });
 
 function AddRecordCard({ onRefresh, userId }) {
@@ -564,11 +575,12 @@ function AddRecordCard({ onRefresh, userId }) {
     const handleImageChange = (index, e) => {
         const file = e.target.files?.[0];
         if (file) {
+            // 미리보기용 base64
             const reader = new FileReader();
             reader.onload = (event) => {
                 const imageData = event.target.result;
                 setFoods((prev) =>
-                    prev.map((f, i) => (i === index ? { ...f, image: imageData } : f)),
+                    prev.map((f, i) => (i === index ? { ...f, image: imageData, imageFile: file } : f)),
                 );
             };
             reader.readAsDataURL(file);
@@ -579,7 +591,7 @@ function AddRecordCard({ onRefresh, userId }) {
     const handleImageRemove = (index, e) => {
         e.stopPropagation();
         setFoods((prev) =>
-            prev.map((f, i) => (i === index ? { ...f, image: null } : f)),
+            prev.map((f, i) => (i === index ? { ...f, image: null, imageFile: null } : f)),
         );
         if (fileInputRefs.current[index]) {
             fileInputRefs.current[index].value = '';
@@ -605,22 +617,23 @@ function AddRecordCard({ onRefresh, userId }) {
         }
 
         try {
-            // 각 음식별로 API POST 요청
+            // 각 음식별로 API POST 요청 (FormData 방식)
             const results = await Promise.all(
                 validFoods.map(async (f) => {
+                    const formData = new FormData();
+                    formData.append('userId', userId);
+                    formData.append('foodCode', f.foodCode);
+                    formData.append('foodName', f.name);
+                    formData.append('servings', 1);
+                    formData.append('mealType', selectedMeal);
+                    formData.append('mealTime', new Date().toISOString());
+                    if (memo) formData.append('memo', memo);
+                    if (f.imageFile) formData.append('image', f.imageFile);
+
                     const response = await fetch(`${API_BASE_URL}/api/meals`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            userId,
-                            foodCode: f.foodCode,
-                            foodName: f.name,
-                            servings: 1,
-                            mealType: selectedMeal,
-                            mealTime: new Date().toISOString(),
-                            memo: memo || null,
-                            imageUrl: f.image || null,
-                        }),
+                        // Content-Type 헤더 생략 (브라우저가 자동 설정)
+                        body: formData,
                     });
 
                     const data = await response.json();
@@ -1028,6 +1041,7 @@ function CustomCalendar({
     currentMonth,
     onMonthChange,
     dayData,
+    datesWithData = [],
 }) {
     const today = new Date();
     const year = currentMonth.getFullYear();
@@ -1107,18 +1121,19 @@ function CustomCalendar({
                     const isToday = isSameDay(thisDate, today);
                     const isSelected = isSameDay(thisDate, selectedDate);
                     const isFuture = thisDate > today;
-                    // 선택된 날짜만 데이터 유무 표시 (DB에서 불러온 데이터 기준)
-                    const hasData = isSelected && selectedDayCalories > 0;
+                    // 해당 날짜에 데이터가 있는지 확인 (월별 API 응답 기준)
+                    const hasData = datesWithData.includes(dateStr);
                     const dayOfWeek = thisDate.getDay();
 
                     return (
-                        <Tooltip
-                            key={idx}
-                            title={hasData ? `${selectedDayCalories} kcal` : ''}
-                            arrow
-                            placement="top"
-                        >
+                        // <Tooltip
+                        //     key={idx}
+                        //     title={hasData ? `${selectedDayCalories} kcal` : ''}
+                        //     arrow
+                        //     placement="top"
+                        // >
                             <Box
+                                key={idx}
                                 onClick={() => !isFuture && onDateSelect(thisDate)}
                                 sx={{
                                     position: 'relative',
@@ -1178,16 +1193,19 @@ function CustomCalendar({
                                 {hasData && (
                                     <Box
                                         sx={{
+                                            position: 'absolute',
+                                            bottom: { xs: 4, lg: 10 },
+                                            left: '50%',
+                                            transform: 'translateX(-50%)',
                                             width: 4,
                                             height: 4,
                                             borderRadius: '50%',
                                             bgcolor: isSelected ? 'rgba(255,255,255,0.8)' : '#FF8243',
-                                            mt: 0.3,
                                         }}
                                     />
                                 )}
                             </Box>
-                        </Tooltip>
+                        // </Tooltip>
                     );
                 })}
             </Box>
@@ -1286,7 +1304,25 @@ export default function DailyLogPage() {
         new Date(today.getFullYear(), today.getMonth(), 1),
     );
     const [dayData, setDayData] = useState(null);
+    const [datesWithData, setDatesWithData] = useState([]); // 해당 월에 데이터 있는 날짜 목록
     const [isLoading, setIsLoading] = useState(false);
+
+    // 월별 데이터 있는 날짜 목록 불러오기
+    const fetchMonthlyDates = async (year, month, userId) => {
+        if (!userId) return;
+        try {
+            const response = await fetch(
+                `${API_BASE_URL}/api/diary/monthly?userId=${userId}&year=${year}&month=${month + 1}`,
+            );
+            if (response.ok) {
+                const data = await response.json();
+                setDatesWithData(data.dates || []);
+            }
+        } catch (error) {
+            console.error('월별 데이터 조회 실패:', error);
+        }
+    };
+
     // API에서 날짜별 식사 데이터 불러오기
     const fetchDailyData = async (date, userId) => {
         if (!userId) return;
@@ -1317,8 +1353,16 @@ export default function DailyLogPage() {
     useEffect(() => {
         if (user?.id) {
             fetchDailyData(today, user.id);
+            fetchMonthlyDates(today.getFullYear(), today.getMonth(), user.id);
         }
     }, [user?.id]);
+
+    // 월 변경 시 해당 월의 데이터 있는 날짜 목록 조회
+    useEffect(() => {
+        if (user?.id) {
+            fetchMonthlyDates(currentMonth.getFullYear(), currentMonth.getMonth(), user.id);
+        }
+    }, [currentMonth, user?.id]);
 
     const handleMonthChange = (delta) => {
         setCurrentMonth(
@@ -1417,6 +1461,7 @@ export default function DailyLogPage() {
                             currentMonth={currentMonth}
                             onMonthChange={handleMonthChange}
                             dayData={dayData}
+                            datesWithData={datesWithData}
                         />
                         <NutritionSummaryPanel date={selectedDate} data={dayData} />
                     </Paper>
