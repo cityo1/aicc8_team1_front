@@ -1,7 +1,22 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 
-const STORAGE_PREFIX = 'profile_';
+// 프로필 조회 API (GET /api/auth/me)
+async function getProfileApi() {
+  const token = localStorage.getItem('accessToken');
+  const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.message ?? `요청 실패 (${res.status})`);
+  }
+  return data;
+}
 
 const defaultProfile = {
   nickname: '',
@@ -17,79 +32,68 @@ export function ProfileProvider({ children }) {
   const { user } = useAuth();
   const [profile, setProfileState] = useState(defaultProfile);
 
-  const storageKey = user?.id ? `${STORAGE_PREFIX}${user.id}` : null;
-
-  // userId 변경 시 localStorage에서 프로필 로드 (auth.user 데이터와 병합)
+  // user 변경 시 프로필 상태 업데이트 (로그인 응답의 user 데이터 사용)
   useEffect(() => {
     if (!user) {
       setProfileState(defaultProfile);
       return;
     }
 
-    const merged = { ...defaultProfile };
+    // auth.user 데이터에서 프로필 추출
+    const profileFromUser = {
+      nickname: user.nickname ?? '',
+      height: user.height != null ? String(user.height) : '',
+      weight: user.weight != null ? String(user.weight) : '',
+      goals: Array.isArray(user.goals) ? user.goals : [],
+      dietary: Array.isArray(user.dietaryRestrictions)
+        ? user.dietaryRestrictions
+        : (Array.isArray(user.dietary) ? user.dietary : []),
+    };
 
-    // 1) auth.user에서 가져올 수 있는 값
-    if (user.nickname) merged.nickname = user.nickname;
-    if (user.height != null) merged.height = String(user.height);
-    if (user.weight != null) merged.weight = String(user.weight);
-    if (Array.isArray(user.goals)) merged.goals = user.goals;
-    if (Array.isArray(user.dietaryRestrictions)) merged.dietary = user.dietaryRestrictions;
-    else if (Array.isArray(user.dietary)) merged.dietary = user.dietary;
+    setProfileState(profileFromUser);
+  }, [user]);
 
-    // 2) localStorage에 저장된 프로필이 있으면 우선 적용
-    if (storageKey && typeof window !== 'undefined') {
-      try {
-        const stored = localStorage.getItem(storageKey);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (parsed.nickname !== undefined) merged.nickname = parsed.nickname;
-          if (parsed.height !== undefined) merged.height = String(parsed.height);
-          if (parsed.weight !== undefined) merged.weight = String(parsed.weight);
-          if (Array.isArray(parsed.goals)) merged.goals = parsed.goals;
-          if (Array.isArray(parsed.dietary)) merged.dietary = parsed.dietary;
-        }
-      } catch {
-        // JSON 파싱 실패 시 auth 병합값만 사용
-      }
+  // 서버에서 프로필 조회 (GET /api/auth/me)
+  const fetchProfile = useCallback(async () => {
+    try {
+      const data = await getProfileApi();
+      console.log('GET /api/auth/me 응답:', data);
+
+      // 응답이 { success, data: {...} } 형태인 경우 data 추출
+      const userData = data.data || data.user || data;
+
+      const fetched = {
+        nickname: userData.nickname ?? '',
+        height: userData.height != null ? String(userData.height) : '',
+        weight: userData.weight != null ? String(userData.weight) : '',
+        goals: Array.isArray(userData.goals) ? userData.goals : [],
+        dietary: Array.isArray(userData.dietaryRestrictions)
+          ? userData.dietaryRestrictions
+          : (Array.isArray(userData.dietary) ? userData.dietary : []),
+      };
+      setProfileState(fetched);
+      return fetched;
+    } catch (err) {
+      console.error('프로필 조회 실패:', err);
+      throw err;
     }
+  }, []);
 
-    setProfileState(merged);
-  }, [user, storageKey]);
-
-  // 프로필 업데이트 시 localStorage에 저장
-  const updateProfile = useCallback(
-    (fieldOrUpdates, value) => {
-      setProfileState((prev) => {
-        const updates =
-          typeof fieldOrUpdates === 'string'
-            ? { [fieldOrUpdates]: value }
-            : fieldOrUpdates;
-        const next = { ...prev, ...updates };
-
-        if (storageKey && typeof window !== 'undefined') {
-          try {
-            const toSave = {
-              nickname: next.nickname ?? '',
-              height: next.height ?? '',
-              weight: next.weight ?? '',
-              goals: next.goals ?? [],
-              dietary: next.dietary ?? [],
-            };
-            localStorage.setItem(storageKey, JSON.stringify(toSave));
-          } catch {
-            // 저장 실패 무시
-          }
-        }
-
-        return next;
-      });
-    },
-    [storageKey]
-  );
+  // 프로필 로컬 상태 업데이트
+  const updateProfile = useCallback((fieldOrUpdates, value) => {
+    setProfileState((prev) => {
+      const updates =
+        typeof fieldOrUpdates === 'string'
+          ? { [fieldOrUpdates]: value }
+          : fieldOrUpdates;
+      return { ...prev, ...updates };
+    });
+  }, []);
 
   const value = {
     profile,
     updateProfile,
+    fetchProfile,
   };
 
   return (
