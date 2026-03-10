@@ -270,23 +270,6 @@ export default function Alert() {
     if (!item.read) markAsRead(item.id);
   };
 
-  const createTestNotifications = async () => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) return;
-    try {
-      const res = await fetch(`${API_BASE}/api/notifications/test`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        credentials: 'include',
-      });
-      const json = await res.json().catch(() => ({}));
-      if (res.ok) fetchNotifications();
-      else setError(json.message ?? '테스트 알림 생성 실패');
-    } catch {
-      setError('테스트 알림 생성 실패');
-    }
-  };
-
   return (
     <div className="p-2 min-h-screen">
       <div className="bg-[#F2F9F5] text-[#1E2923] w-full max-w-2xl mx-auto rounded-2xl border border-gray-100 p-6">
@@ -354,13 +337,6 @@ export default function Alert() {
                 <p className="text-gray-400 text-sm mt-1">
                   새로운 알림이 오면 여기에 표시됩니다.
                 </p>
-                <button
-                  type="button"
-                  onClick={createTestNotifications}
-                  className="mt-4 px-4 py-2 text-sm font-medium text-[#FF8243] bg-orange-50 rounded-lg hover:bg-orange-100"
-                >
-                  테스트 알림 생성
-                </button>
               </div>
             )}
           </div>
