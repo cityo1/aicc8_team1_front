@@ -15,7 +15,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { analyzeFoodImage, reanalyzeFood } from '../../api/scan';
+import { analyzeFoodImage, reanalyzeFood, saveAiScan } from '../../api/scan';
 import { saveScanToDiary } from '../../api/diary';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -38,6 +38,7 @@ const App = () => {
   const [imageRect, setImageRect] = useState(null); // { left, top, width, height } px, 컨테이너 기준
   const [mealType, setMealType] = useState('breakfast');
   const [isSaving, setIsSaving] = useState(false);
+  const [aiScanId, setAiScanId] = useState(null); // ai_scans 저장 후 id (기록하기 시 사용)
   const fileInputRef = useRef(null);
   const imgContainerRef = useRef(null);
   const imgRef = useRef(null);
@@ -147,6 +148,26 @@ const App = () => {
         macros: { protein, fat, carbs, sugar },
       }));
       setAppliedFoods(payload);
+
+      // ai_scans 테이블에 재분석 결과 저장 (user 로그인 시, uploads 폴더에 이미지 저장)
+      if (user?.id && selectedFile) {
+        try {
+          const saveRes = await saveAiScan({
+            userId: user.id,
+            imageFile: selectedFile,
+            scanResult: {
+              foods: mergedFoods,
+              totalCalories,
+              macros: { protein, fat, carbs, sugar },
+            },
+          });
+          if (saveRes?.data?.ai_scan_id) {
+            setAiScanId(saveRes.data.ai_scan_id);
+          }
+        } catch (saveErr) {
+          console.warn('ai_scans 재분석 저장 실패:', saveErr);
+        }
+      }
     } catch (err) {
       setError(err.message || '재분석 중 오류가 발생했습니다.');
     } finally {
@@ -204,8 +225,9 @@ const App = () => {
     setSelectedFile(file);
     const reader = new FileReader();
     reader.onloadend = () => {
-      setSelectedImage(reader.result);
-      startScanning(file);
+      const imageData = reader.result;
+      setSelectedImage(imageData);
+      startScanning(file, imageData);
     };
     reader.readAsDataURL(file);
   };
@@ -235,7 +257,7 @@ const App = () => {
     if (file) processFile(file);
   };
 
-  const startScanning = async (file) => {
+  const startScanning = async (file, imageData) => {
     setStep('scanning');
     try {
       const res = await analyzeFoodImage(file);
@@ -247,7 +269,7 @@ const App = () => {
         0,
       );
       const sugar = foods.reduce((s, f) => s + (Number(f.sugars) || 0), 0);
-      setAnalysis({
+      const analysisData = {
         foodName: foods.map((f) => f.name).join(', ') || '분석된 음식',
         calories: totalCalories,
         macros: { protein, fat, carbs, sugar },
@@ -257,7 +279,25 @@ const App = () => {
             ? `총 ${foods.length}종의 음식이 분석되었습니다.`
             : '영양 균형을 위해 다양한 식재료를 곁들이면 좋습니다.',
         rawFoods: foods,
-      });
+      };
+      setAnalysis(analysisData);
+
+      // ai_scans 테이블에 저장 (user 로그인 시, uploads 폴더에 이미지 저장)
+      if (user?.id && file) {
+        try {
+          const saveRes = await saveAiScan({
+            userId: user.id,
+            imageFile: file,
+            scanResult: { foods, totalCalories, macros: { protein, fat, carbs, sugar } },
+          });
+          if (saveRes?.data?.ai_scan_id) {
+            setAiScanId(saveRes.data.ai_scan_id);
+          }
+        } catch (saveErr) {
+          console.warn('ai_scans 저장 실패:', saveErr);
+          setAiScanId(null);
+        }
+      }
     } catch (err) {
       setError(err.message || '분석 중 오류가 발생했습니다.');
       setStep('upload');
@@ -274,6 +314,7 @@ const App = () => {
     setAnalysis(null);
     setEditableFoods([]);
     setAppliedFoods([]);
+    setAiScanId(null);
     setError(null);
     setStep('upload');
   };
@@ -731,7 +772,8 @@ const App = () => {
                         userId: user.id,
                         mealType,
                         mealTime: new Date().toISOString(),
-                        imageUrl: selectedImage || null,
+                        aiScanId: aiScanId || null,
+                        imageUrl: aiScanId ? null : (selectedImage || null),
                         foods,
                       });
                       navigate('/home/dailyLog');
