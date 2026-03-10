@@ -4,42 +4,6 @@ import { authApi } from '../../api/auth';
 import { useAuth } from '../../contexts/AuthContext';
 import { useProfile } from '../../contexts/ProfileContext';
 import { useNotification } from '../../contexts/NotificationContext';
-
-// 프로필 수정 API (PUT /api/auth/profile)
-async function updateProfileApi(profileData) {
-  const token = localStorage.getItem('accessToken');
-  const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/profile`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-    },
-    body: JSON.stringify(profileData),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data.message ?? `요청 실패 (${res.status})`);
-  }
-  return data;
-}
-
-// 회원탈퇴 API (DELETE /api/auth/withdraw)
-async function withdrawApi() {
-  const token = localStorage.getItem('accessToken');
-  const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/withdraw`, {
-    method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-    },
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data.message ?? `요청 실패 (${res.status})`);
-  }
-  return data;
-}
-
 import {
   Box,
   Button,
@@ -220,6 +184,12 @@ export default function Setting() {
     dietary: [],
   });
 
+  // 페이지 진입 시 서버에서 최신 프로필 조회 (마운트 시 1회)
+  useEffect(() => {
+    fetchProfile().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // profile이 변경되면 로컬 form 상태 초기화
   useEffect(() => {
     setForm({
@@ -241,7 +211,7 @@ export default function Setting() {
     setError('');
     setInfoMessage('');
     try {
-      await updateProfileApi({
+      await authApi.updateProfile({
         nickname: form.nickname,
         height: Number(form.height) || 0,
         weight: Number(form.weight) || 0,
@@ -277,7 +247,7 @@ export default function Setting() {
     setError('');
     setInfoMessage('');
     try {
-      await withdrawApi();
+      await authApi.withdraw();
       setDeleteDialogOpen(false);
       auth.logout();
       navigate('/login');

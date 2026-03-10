@@ -44,6 +44,12 @@ export function AuthProvider({ children }) {
         setToken(newToken);
     };
 
+    // 유저 정보 갱신 (프로필 수정 후 호출)
+    const updateUser = (userData) => {
+        localStorage.setItem(USER_KEY, JSON.stringify(userData));
+        setUser(userData);
+    };
+
     const value = {
         user,
         token,
@@ -52,6 +58,7 @@ export function AuthProvider({ children }) {
         login,
         logout,
         updateToken,
+        updateUser,
     };
 
     return (

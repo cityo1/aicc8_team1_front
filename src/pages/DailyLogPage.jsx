@@ -516,7 +516,7 @@ const EMPTY_FOOD = () => ({
     imageFile: null,  // 서버 전송용 File 객체
 });
 
-function AddRecordCard({ onRefresh, userId }) {
+function AddRecordCard({ onRefresh, userId, selectedDate }) {
     const [open, setOpen] = useState(false);
     const [selectedMeal, setSelectedMeal] = useState('breakfast');
     const [foods, setFoods] = useState([EMPTY_FOOD()]);
@@ -629,7 +629,10 @@ function AddRecordCard({ onRefresh, userId }) {
                     formData.append('foodName', f.name);
                     formData.append('servings', 1);
                     formData.append('mealType', selectedMeal);
-                    formData.append('mealTime', new Date().toISOString());
+                    // 로컬 시간대를 유지한 ISO 문자열 생성 (timezone offset 적용)
+                    const mealDate = selectedDate || new Date();
+                    const localISOString = new Date(mealDate.getTime() - mealDate.getTimezoneOffset() * 60000).toISOString();
+                    formData.append('mealTime', localISOString);
                     if (memo) formData.append('memo', memo);
                     if (f.imageFile) formData.append('image', f.imageFile);
 
@@ -1401,6 +1404,7 @@ export default function DailyLogPage() {
 
     // 저장 후 데이터 새로고침
     const handleRefreshData = async () => {
+        console.log('handleRefreshData 호출됨, user:', user, 'selectedDate:', selectedDate);
         if (user?.id) {
             await fetchDailyData(selectedDate, user.id);
         }
@@ -1580,7 +1584,7 @@ export default function DailyLogPage() {
                         <Box sx={{ display: 'flex', gap: 2, mt: 1.5 }}>
                             <Box sx={{ width: 20, flexShrink: 0 }} />
                             <Box sx={{ flexGrow: 1 }}>
-                                <AddRecordCard onRefresh={handleRefreshData} userId={user?.id} />
+                                <AddRecordCard onRefresh={handleRefreshData} userId={user?.id} selectedDate={selectedDate} />
                             </Box>
                         </Box>
                     </Stack>
