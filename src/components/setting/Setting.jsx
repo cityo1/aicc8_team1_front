@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../../api/auth';
 import { useAuth } from '../../contexts/AuthContext';
@@ -32,6 +32,7 @@ import {
   NoFood,
   Logout,
   PersonRemove,
+  Save,
 } from '@mui/icons-material';
 
 // ─── 목표 / 식이 제한 옵션 (RegisterPage와 동일) ─────────────────────────────
@@ -164,18 +165,67 @@ function CheckboxGrid({ options, selected, onChange }) {
 export default function Setting() {
   const navigate = useNavigate();
   const auth = useAuth();
-  const { profile, updateProfile } = useProfile();
-  const { notificationEnabled, setNotificationEnabled } = useNotification();
+  const { profile, updateProfile, fetchProfile } = useProfile();
+  const { notificationEnabled, setNotificationEnabled, notificationLoading } = useNotification();
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [saveLoading, setSaveLoading] = useState(false);
   const [error, setError] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
 
-  const handleProfileChange = (field, value) => {
-    updateProfile(field, value);
+  // 로컬 form 상태 (수정하기 버튼 누르기 전까지 sidebar에 반영되지 않음)
+  const [form, setForm] = useState({
+    nickname: '',
+    height: '',
+    weight: '',
+    goals: [],
+    dietary: [],
+  });
+
+  // 페이지 진입 시 서버에서 최신 프로필 조회 (마운트 시 1회)
+  useEffect(() => {
+    fetchProfile().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // profile이 변경되면 로컬 form 상태 초기화
+  useEffect(() => {
+    setForm({
+      nickname: profile.nickname || '',
+      height: profile.height || '',
+      weight: profile.weight || '',
+      goals: profile.goals || [],
+      dietary: profile.dietary || [],
+    });
+  }, [profile]);
+
+  const handleFormChange = (field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
     setError('');
+  };
+
+  const handleSaveProfile = async () => {
+    setSaveLoading(true);
+    setError('');
+    setInfoMessage('');
+    try {
+      await authApi.updateProfile({
+        nickname: form.nickname,
+        height: Number(form.height) || 0,
+        weight: Number(form.weight) || 0,
+        goals: form.goals,
+        dietaryRestrictions: form.dietary,
+      });
+      // 수정 성공 후 서버에서 최신 데이터 다시 조회 (sidebar 업데이트)
+      await fetchProfile();
+      setInfoMessage('프로필이 성공적으로 수정되었습니다.');
+    } catch (err) {
+      setError(err.message || '프로필 수정에 실패했습니다.');
+    } finally {
+      setSaveLoading(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -197,12 +247,10 @@ export default function Setting() {
     setError('');
     setInfoMessage('');
     try {
-      // TODO: 회원탈퇴 API 연동 시 아래 주석 해제 및 엔드포인트 수정
-      // await api.delete('/api/auth/withdraw');
-      // auth.logout();
-      // navigate('/login');
+      await authApi.withdraw();
       setDeleteDialogOpen(false);
-      setInfoMessage('회원탈퇴 기능은 곧 제공될 예정입니다.');
+      auth.logout();
+      navigate('/login');
     } catch (err) {
       setError(err.message || '회원탈퇴에 실패했습니다.');
     } finally {
@@ -243,8 +291,8 @@ export default function Setting() {
           <TextField
             fullWidth
             label="닉네임"
-            value={profile.nickname}
-            onChange={(e) => handleProfileChange('nickname', e.target.value)}
+            value={form.nickname}
+            onChange={(e) => handleFormChange('nickname', e.target.value)}
             placeholder="앱에서 사용할 이름"
             InputProps={{
               startAdornment: (
@@ -264,8 +312,8 @@ export default function Setting() {
               fullWidth
               label="키"
               type="number"
-              value={profile.height}
-              onChange={(e) => handleProfileChange('height', e.target.value)}
+              value={form.height}
+              onChange={(e) => handleFormChange('height', e.target.value)}
               placeholder="170"
               InputProps={{
                 endAdornment: (
@@ -282,8 +330,8 @@ export default function Setting() {
               fullWidth
               label="몸무게"
               type="number"
-              value={profile.weight}
-              onChange={(e) => handleProfileChange('weight', e.target.value)}
+              value={form.weight}
+              onChange={(e) => handleFormChange('weight', e.target.value)}
               placeholder="65"
               InputProps={{
                 endAdornment: (
@@ -321,8 +369,8 @@ export default function Setting() {
             </Box>
             <CheckboxGrid
               options={GOAL_OPTIONS}
-              selected={profile.goals}
-              onChange={(v) => handleProfileChange('goals', v)}
+              selected={form.goals}
+              onChange={(v) => handleFormChange('goals', v)}
             />
           </Box>
 
@@ -349,10 +397,28 @@ export default function Setting() {
             </Box>
             <CheckboxGrid
               options={DIET_OPTIONS}
-              selected={profile.dietary}
-              onChange={(v) => handleProfileChange('dietary', v)}
+              selected={form.dietary}
+              onChange={(v) => handleFormChange('dietary', v)}
             />
           </Box>
+
+          {/* 수정하기 버튼 */}
+          <Button
+            fullWidth
+            variant="contained"
+            size="large"
+            onClick={handleSaveProfile}
+            disabled={saveLoading}
+            startIcon={<Save />}
+            sx={{
+              mt: 3,
+              py: 1.5,
+              bgcolor: '#FF8243',
+              '&:hover': { bgcolor: '#E05A1F' },
+            }}
+          >
+            {saveLoading ? '저장 중...' : '수정하기'}
+          </Button>
         </Box>
 
         {/* ── 알림 설정 ── */}
@@ -376,6 +442,7 @@ export default function Setting() {
                 <Switch
                   checked={notificationEnabled}
                   onChange={(e) => setNotificationEnabled(e.target.checked)}
+                  disabled={notificationLoading}
                   sx={{
                     '& .MuiSwitch-switchBase.Mui-checked': {
                       color: '#FF8243',
@@ -388,7 +455,7 @@ export default function Setting() {
               }
               label={
                 <Typography variant="body2" color="text.secondary">
-                  {notificationEnabled ? '알림 켜짐' : '알림 꺼짐'}
+                  {notificationLoading ? '저장 중...' : notificationEnabled ? '알림 켜짐' : '알림 꺼짐'}
                 </Typography>
               }
             />
