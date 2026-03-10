@@ -3,11 +3,13 @@ import { useAuth } from './AuthContext';
 import { userApi } from '../api/auth';
 
 const STORAGE_KEY = 'notificationEnabled';
+const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
 const NotificationContext = createContext(null);
 
 export function NotificationProvider({ children }) {
   const { user } = useAuth();
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
   const [enabled, setEnabledState] = useState(() => {
     if (typeof window === 'undefined') return true;
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -28,6 +30,38 @@ export function NotificationProvider({ children }) {
       console.error('알림 설정 조회 실패:', err);
     }
   }, [user]);
+
+  // 미읽음 알림 여부 조회 (종 아이콘 빨간 점용)
+  const fetchUnreadStatus = useCallback(async () => {
+    if (!user || !enabled) {
+      setHasUnreadNotifications(false);
+      return;
+    }
+    const token = localStorage.getItem('accessToken');
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/notifications`, {
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
+      });
+      const json = await res.json().catch(() => ({}));
+      const list = json.data ?? json ?? [];
+      const arr = Array.isArray(list) ? list : [];
+      const hasUnread = arr.some((n) => !n.read);
+      setHasUnreadNotifications(hasUnread);
+    } catch {
+      setHasUnreadNotifications(false);
+    }
+  }, [user, enabled]);
+
+  // user/알림설정 변경 시 미읽음 상태 조회
+  useEffect(() => {
+    if (user && enabled) {
+      fetchUnreadStatus();
+    } else {
+      setHasUnreadNotifications(false);
+    }
+  }, [user, enabled, fetchUnreadStatus]);
 
   // user 변경 시 서버에서 설정 조회
   useEffect(() => {
@@ -55,11 +89,19 @@ export function NotificationProvider({ children }) {
     }
   };
 
+  const setUnreadFromList = useCallback((list) => {
+    const arr = Array.isArray(list) ? list : [];
+    setHasUnreadNotifications(arr.some((n) => !n.read));
+  }, []);
+
   const value = {
     notificationEnabled: enabled,
     setNotificationEnabled: setEnabled,
     notificationLoading: loading,
     fetchNotificationSettings,
+    hasUnreadNotifications,
+    fetchUnreadStatus,
+    setUnreadFromList,
   };
 
   return (
