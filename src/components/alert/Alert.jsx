@@ -98,10 +98,19 @@ const API_BASE = import.meta.env.VITE_API_URL ?? '';
 function formatNotificationTime(createdAt) {
   if (!createdAt) return '';
   const date = new Date(createdAt);
+  if (Number.isNaN(date.getTime())) return '';
   const now = new Date();
   const diffMs = now - date;
   const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
 
+  // diffDays < 0: 서버/클라이언트 타임존 차이로 미래로 해석될 때 → 오늘·방금으로 표시
+  if (diffDays < 0) {
+    const h = date.getHours();
+    const m = date.getMinutes();
+    const ampm = h < 12 ? '오전' : '오후';
+    const hour = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return `${ampm} ${hour}:${String(m).padStart(2, '0')}`;
+  }
   if (diffDays === 0) {
     const h = date.getHours();
     const m = date.getMinutes();
@@ -168,7 +177,7 @@ function getNotificationStyle(type) {
 }
 
 export default function Alert() {
-  const { notificationEnabled } = useNotification();
+  const { notificationEnabled, setUnreadFromList } = useNotification();
   const { updateToken: authUpdateToken } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -201,7 +210,9 @@ export default function Alert() {
       setError(null);
       try {
         const list = await doFetch(token);
-        setNotifications(Array.isArray(list) ? list : []);
+        const arr = Array.isArray(list) ? list : [];
+        setNotifications(arr);
+        setUnreadFromList(arr);
       } catch (err) {
         if (!retried && (err.status === 401 || err.code === 'TOKEN_EXPIRED')) {
           try {
@@ -210,16 +221,20 @@ export default function Alert() {
             localStorage.setItem('accessToken', newToken);
             authUpdateToken?.(newToken);
             const list = await doFetch(newToken);
-            setNotifications(Array.isArray(list) ? list : []);
+            const arr = Array.isArray(list) ? list : [];
+            setNotifications(arr);
+            setUnreadFromList(arr);
             setError(null);
             return;
           } catch {
             setError('다시 로그인해 주세요.');
             setNotifications([]);
+            setUnreadFromList([]);
           }
         } else {
           setError(err.message ?? '알림을 불러오지 못했어요');
           setNotifications([]);
+          setUnreadFromList([]);
         }
       } finally {
         setLoading(false);
@@ -241,9 +256,11 @@ export default function Alert() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) return;
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+      const next = notifications.map((n) =>
+        n.id === id ? { ...n, read: true } : n
       );
+      setNotifications(next);
+      setUnreadFromList(next); // 사이드바 빨간 점 갱신
     } catch {
       // 무시
     }
@@ -292,8 +309,8 @@ export default function Alert() {
                 </p>
                 <p className="text-gray-500 text-sm mt-1">{error}</p>
               </div>
-            ) : notifications.length > 0 ? (
-              notifications.map((item) => {
+            ) : notifications.filter((n) => !n.read).length > 0 ? (
+              notifications.filter((item) => !item.read).map((item) => {
                 const style = getNotificationStyle(item.type);
                 const Icon = style.icon;
                 return (

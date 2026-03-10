@@ -142,6 +142,28 @@ export const userApi = {
             method: 'PUT',
             body: JSON.stringify({ receiveNotifications: enabled }),
         }),
+
+    // meal_nudge 식사 기록 시간 조회 (GET /api/users/me/meal-pattern)
+    getMealPattern: () =>
+        request('/api/users/me/meal-pattern', { method: 'GET' }),
+
+    // meal_nudge 식사 기록 시간 수정 (PUT /api/users/me/meal-pattern)
+    updateMealPattern: (data) =>
+        request('/api/users/me/meal-pattern', {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        }),
+
+    // 알림 유형별 설정 조회 (GET /api/users/me/notification-type-settings)
+    getNotificationTypeSettings: () =>
+        request('/api/users/me/notification-type-settings', { method: 'GET' }),
+
+    // 알림 유형별 설정 수정 (PUT /api/users/me/notification-type-settings)
+    updateNotificationTypeSettings: (data) =>
+        request('/api/users/me/notification-type-settings', {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        }),
 };
 
 // 일반 API 요청용 (인증 필요한 API에서 사용)

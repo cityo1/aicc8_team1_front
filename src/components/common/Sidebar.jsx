@@ -19,7 +19,7 @@ import { authApi } from '../../api/auth';
 const Sidebar = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const { profile } = useProfile();
-  const { notificationEnabled } = useNotification();
+  const { notificationEnabled, hasUnreadNotifications } = useNotification();
   const navigate = useNavigate();
 
   const menuItems = [
@@ -42,12 +42,24 @@ const Sidebar = () => {
     },
   ];
 
+  const bellIcon = notificationEnabled ? <Bell size={18} /> : <BellOff size={18} />;
+  const notificationItem = {
+    path: '/home/notifications',
+    icon: (
+      <span className="relative inline-flex">
+        {bellIcon}
+        {notificationEnabled && hasUnreadNotifications && (
+          <span
+            className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full"
+            aria-hidden="true"
+          />
+        )}
+      </span>
+    ),
+    label: notificationEnabled ? '알림' : '알림 꺼짐',
+  };
   const bottomItems = [
-    {
-      path: '/home/notifications',
-      icon: notificationEnabled ? <Bell size={18} /> : <BellOff size={18} />,
-      label: notificationEnabled ? '알림' : '알림 꺼짐',
-    },
+    notificationItem,
     { path: '/home/settings', icon: <Settings size={18} />, label: '환경설정' },
   ];
 
