@@ -1,114 +1,235 @@
-import React from 'react';
-import { FaStar, FaCheckSquare, FaRegCheckSquare } from 'react-icons/fa';
+import React, { useState, useRef, useEffect } from 'react';
+import { FaRegStar, FaStar } from 'react-icons/fa';
 import { TbTrashX } from 'react-icons/tb';
-
-/**
- * @param {Object} food - 음식 데이터 객체
- * @param {boolean} isFavorite - 즐겨찾기 상태
- * @param {boolean} isChecked - 체크박스 선택 상태 (추가)
- * @param {function} onToggleFavorite - 즐겨찾기 토글 함수
- * @param {function} onToggleCheck - 체크박스 토글 함수 (추가)
- * @param {function} onDelete - 삭제 함수
- */
+import { useNavigate } from 'react-router-dom';
+import { MdOutlineHorizontalRule } from 'react-icons/md';
 
 const FoodCardRecommend = ({
   food,
   isFavorite,
   onToggleFavorite,
   onDelete,
-  isChecked,
-  onToggleCheck,
 }) => {
-  return (
-    <div className="bg-white rounded-2xl p-3 border border-gray-100 shadow-sm relative flex flex-col group hover:shadow-md transition-shadow duration-200">
-      {/* 음식 이미지 섹션 */}
-      <div className="relative w-full h-49 mb-3 overflow-hidden rounded-xl">
-        <img
-          src={food.image}
-          alt={food.name}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-        />
-      </div>
+  const [isOverflowing, setIsOverflowing] = useState(false);
+  const [tags, setTags] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-      {/* 텍스트 정보 섹션 */}
-      <div className="flex-1 flex flex-col">
-        <div className="flex items-center justify-between">
-          <h3 className="font-bold text-[15px] text-[#1E2923] mb-1 truncate">
-            {food.name}
-          </h3>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={(e) => {
-                e.stopPropagation(); // 카드 클릭 이벤트와 분리
-                onToggleCheck();
-              }}
-              className="text-[#FF8243] cursor-pointer"
+  const titleRef = useRef(null);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const fetchAiTags = async () => {
+      if (tags.length > 0 || isLoading) return;
+
+      setIsLoading(true);
+      const startTime = Date.now();
+
+      try {
+        const apiKey =
+          import.meta.env?.VITE_OPENAI_API_KEY ||
+          process?.env?.REACT_APP_OPENAI_API_KEY;
+
+        if (!apiKey) {
+          setIsLoading(false);
+          return;
+        }
+
+        const response = await fetch(
+          'https://api.openai.com/v1/chat/completions',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model: 'gpt-3.5-turbo',
+              messages: [
+                {
+                  role: 'user',
+                  content: `음식명: ${food.name}, 칼로리: ${food.kcal}, 탄수: ${food.carbs}, 단백질: ${food.protein}, 지방: ${food.fat}, 당: ${food.sugar}`,
+                },
+                {
+                  role: 'assistant',
+                  content:
+                    '당신은 영양사입니다. 영양성분 데이터를 보고 [#고단백, #다이어트, #비건, #저탄수, #0kcal, #저당, #과일, #저지방, #고지방, #고칼로리, #고당] 중 적합한 태그를 골라 JSON 배열 형태로만 응답하세요. 예: ["#고단백"]. 해당 없으면 [] 반환.',
+                },
+              ],
+              temperature: 0.3,
+            }),
+          },
+        );
+
+        const data = await response.json();
+
+        if (duration < minWait) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, minWait - duration),
+          );
+        }
+
+        if (data.choices?.[0]?.message?.content) {
+          const aiTags = JSON.parse(data.choices[0].message.content);
+          setTags(aiTags);
+        }
+      } catch (error) {
+        console.error('AI 태그 생성 실패:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchAiTags();
+  }, [food]);
+
+  useEffect(() => {
+    if (!isLoading && titleRef.current && containerRef.current) {
+      const hasOverflow =
+        titleRef.current.scrollWidth > containerRef.current.clientWidth;
+      setIsOverflowing(hasOverflow);
+    }
+  }, [food.name, isLoading]);
+
+  const navigate = useNavigate();
+
+  return (
+    <div className="w-full bg-white rounded-2xl py-4 px-5 border border-gray-100 shadow-sm relative flex flex-col mb-4 hover:shadow-md transition-shadow">
+      {/* 상단: 제목 및 즐겨찾기 */}
+      <div className="flex justify-between items-start mb-3 gap-4">
+        <div
+          ref={containerRef}
+          className="flex-1 overflow-hidden rounded-lg px-1 py-1 h-[38px] flex items-center"
+        >
+          <div className="relative w-full overflow-hidden">
+            <h3
+              ref={titleRef}
+              className={`inline-block font-bold text-lg text-[#1E2923] whitespace-nowrap ${isOverflowing ? 'animate-marquee' : ''}`}
             >
-              {isChecked ? (
-                <FaCheckSquare size={18} color="#FF8243" />
-              ) : (
-                <FaRegCheckSquare size={18} color="#6a7282" />
-              )}
-            </button>
+              {food.name}
+              {isOverflowing && <span className="ml-12">{food.name}</span>}
+            </h3>
           </div>
         </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleFavorite(food.id);
+          }}
+          className="focus:outline-none p-2"
+        >
+          {isFavorite ? (
+            <FaStar size={23} color="#FF8243" />
+          ) : (
+            <FaRegStar size={23} color="#FF8243" />
+          )}
+        </button>
+      </div>
 
-        <p className="text-[13px] text-gray-500 line-clamp-3 leading-relaxed mb-3 h-13">
-          {food.description}
-        </p>
+      {/* 영양성분 그리드 */}
+      <div className="grid grid-cols-5 gap-2 mb-3">
+        {[
+          {
+            label: '칼로리',
+            value: food.kcal,
+            unit: 'kcal',
+            color: 'text-[#FF8243]',
+          },
+          { label: '탄수화물', value: food.carbs, unit: 'g' },
+          { label: '단백질', value: food.protein, unit: 'g' },
+          { label: '지방', value: food.fat, unit: 'g' },
+          { label: '당', value: food.sugar, unit: 'g' },
+        ].map((item, idx) => {
+          const isEmpty = !item.value;
+
+          return (
+            <div
+              key={idx}
+              className="flex flex-col items-center justify-center p-2 bg-[#F9FBFA] rounded-xl border border-gray-50"
+            >
+              <span className="text-[12px] mb-1">{item.label}</span>
+              <span
+                className={`flex items-center justify-center text-[13.5px] font-bold h-5 ${item.color || 'text-gray-700'} `}
+              >
+                {isEmpty ? (
+                  <MdOutlineHorizontalRule size={20} color="364153" />
+                ) : (
+                  `${item.value}${item.unit}`
+                )}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 태그 영역 */}
+      <div className="flex flex-wrap gap-1.5 mb-3 min-h-[23px]">
+        {tags.map((tag, idx) => (
+          <span
+            key={idx}
+            className="px-2 py-0.5 bg-[#1E2923] text-[#FF8243] text-[11px] font-bold rounded-md"
+          >
+            {tag}
+          </span>
+        ))}
+      </div>
+
+      {/* 하단: 삭제 및 선택 버튼 */}
+      <div className="flex justify-between items-center">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(food.id, food.name);
+          }}
+          className="p-1 text-gray-300 hover:text-gray-700"
+        >
+          <TbTrashX size={23} />
+        </button>
 
         <button
           onClick={(e) => {
-            e.stopPropagation(); // 카드 자체 클릭 이벤트가 있다면 간섭 방지
-            onToggleFavorite(food.id); // 부모 컴포넌트의 favorites 상태 변경
+            e.stopPropagation();
+            console.log(food, '비슷한 음식 보기');
           }}
-          className="absolute top-2 right-2 p-1.5 bg-white/90 backdrop-blur-sm rounded-full shadow-sm hover:bg-white transition-colors"
+          className="w-50 py-2 bg-[#ffffff] text-[#FF8243] font-bold rounded-xl shadow-sm border-3 border-[#FF8243] text-[15px] ml-35"
         >
-          <FaStar
-            size={19}
-            className={`transition-colors duration-200 ${
-              isFavorite ? 'text-[#FF8243]' : 'text-gray-300'
-            }`}
-          />
+          비슷한 음식 보기
         </button>
 
-        <div className="flex items-center justify-between ">
-          {/* 태그 리스트 */}
-          <div className="flex flex-wrap gap-1 mt-auto">
-            {food.tags &&
-              food.tags.map((tag, index) => (
-                <span
-                  key={index}
-                  className="text-[12px] bg-[#F9FBFA] border border-gray-100 px-1 py-0.5 rounded-md text-gray-600"
-                >
-                  #{tag}
-                </span>
-              ))}
-          </div>
-
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              if (isFavorite) {
-                if (
-                  window.confirm(
-                    '즐겨찾기에 등록된 항목입니다. 정말 삭제하시겠습니까?',
-                  )
-                ) {
-                  onDelete(food.id, food.name);
-                }
-              } else {
-                // 즐겨찾기가 아닌 경우 바로 삭제
-                onDelete(food.id, food.name);
-              }
-            }}
-            className="text-gray-400 hover:text-gray-700 transition-colors duration-200"
-            title="삭제"
-          >
-            <TbTrashX size={20} />
-          </button>
-        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate('/home/dailyLog');
+          }}
+          className="w-35 py-2 bg-[#FF8243] border-3 border-[#FF8243] text-white font-bold rounded-xl shadow-sm hover:bg-[#e6753d] transition-colors text-[15px]"
+        >
+          선택하기
+        </button>
       </div>
+
+      <style>{`
+  .animate-marquee {
+    display: inline-block;
+    animation: marquee 10s linear infinite;
+  }
+
+  @keyframes marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); } 
+  }
+
+  .animate-marquee:hover {
+    animation-play-state: paused;
+  }
+
+  .mask-fade {
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 5%,
+      black 95%,
+      transparent
+    );
+  }
+`}</style>
     </div>
   );
 };

@@ -4,7 +4,7 @@ import FoodCardRecommend from './FoodCardRecommend';
 import { FaStar, FaSearch } from 'react-icons/fa';
 import { TbMessageChatbot } from 'react-icons/tb';
 import { IoMdRefresh } from 'react-icons/io';
-import { LuPanelTopOpen } from 'react-icons/lu';
+import { LuArrowDownUp, LuCheck } from 'react-icons/lu';
 
 const RecommendPage = () => {
   const navigate = useNavigate();
@@ -18,6 +18,18 @@ const RecommendPage = () => {
   const [isDataLoading, setIsDataLoading] = useState(false);
   const [sortType, setSortType] = useState('latest');
 
+  const [isSortOpen, setIsSortOpen] = useState(false);
+  const sortRef = useRef(null);
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (sortRef.current && !sortRef.current.contains(e.target)) {
+        setIsSortOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // 즐겨찾기 로컬스토리지 연동
   const [favorites, setFavorites] = useState(() => {
     const saved = localStorage.getItem('food-favorites');
@@ -28,17 +40,39 @@ const RecommendPage = () => {
     localStorage.setItem('food-favorites', JSON.stringify(favorites));
   }, [favorites]);
 
-  // 초기 랜덤 데이터 로드 (기존 기능 유지)
+  /**
+   * 데이터 정규화 함수
+   */
+  const normalizeData = (data) => {
+    const rawList = Array.isArray(data) ? data : data.foods || [];
+    return rawList.map((f) => ({
+      id: f.id || Math.random(),
+      name: f.name || f.title || '이름 없음',
+      description: f.description || '',
+      tags: f.tags || [],
+      kcal: f.kcal || f.calories || 0,
+      carbs: f.carbs || 0,
+      protein: f.protein || 0,
+      fat: f.fat || 0,
+      sugar: f.sugar || 0,
+    }));
+  };
+
+  // 초기 랜덤 데이터 로드
+  const fetchRandomFoods = async () => {
+    setIsDataLoading(true);
+    try {
+      const res = await fetch('http://localhost:8000/api/recommend/random');
+      const data = await res.json();
+      setRecommendedFoods(normalizeData(data));
+    } catch (err) {
+      console.error('초기 로드 실패', err);
+    } finally {
+      setIsDataLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchRandomFoods = async () => {
-      try {
-        const res = await fetch('/api/recommend/random');
-        const data = await res.json();
-        if (data.success) setRecommendedFoods(data.foods);
-      } catch (err) {
-        console.error('초기 로드 실패', err);
-      }
-    };
     fetchRandomFoods();
   }, []);
 
@@ -54,16 +88,26 @@ const RecommendPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef(null);
 
-  // 태그 목록
-  const filterTags = ['고단백', '다이어트', '비건', '저탄수', '0kcal', '저당'];
+  // 상단 필터 태그 목록
+  const filterTags = [
+    '고단백',
+    '다이어트',
+    '채소',
+    '고지방',
+    '고당',
+    '저탄수',
+    '0kcal',
+    '저당',
+    '고칼로리',
+    '과일',
+    '저지방',
+  ];
 
-  /**
-   * [핵심] AI 챗봇 전송 및 데이터 파싱
-   * OpenAI 분석 결과와 DB의 음식 데이터를 한꺼번에 가져옵니다.
-   */
+  // AI 챗봇 전송
   const sendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
 
+    const token = localStorage.getItem('accessToken');
     const userMsg = { role: 'user', content: inputMessage };
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
@@ -72,36 +116,34 @@ const RecommendPage = () => {
     setInputMessage('');
     setIsLoading(true);
 
-    // 사용자의 현재 영양 상태 (예시: 실제 데이터 연동 가능)
-    const userNutrientStatus = {
-      deficiency: 'Protein', // 단백질 결핍 상태 가정
-      dailyGoal: '2000kcal',
-      status: 'Active',
-    };
-
     try {
-      const response = await fetch('/api/recommend', {
+      const response = await fetch('http://localhost:8000/api/recommend/save', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           messages: updatedMessages,
           inputMessage: currentInput,
-          userNutrients: userNutrientStatus,
         }),
       });
 
       const data = await response.json();
 
-      // AI 답변 추가
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: data.reply },
-      ]);
+      if (data.success) {
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: data.chatContent || data.reply },
+        ]);
 
-      // DB 검색 결과가 있으면 카드 리스트 맨 앞에 추가
-      if (data.foods && data.foods.length > 0) {
-        setRecommendedFoods((prev) => [...data.foods, ...prev]);
-        triggerLoading();
+        if (data.foods && data.foods.length > 0) {
+          setRecommendedFoods((prev) => [
+            ...normalizeData(data.foods),
+            ...prev,
+          ]);
+          triggerLoading();
+        }
       }
     } catch (error) {
       console.error('Chat API Error:', error);
@@ -119,7 +161,6 @@ const RecommendPage = () => {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, isLoading]);
 
-  // 로딩 트리거
   const triggerLoading = () => {
     setIsDataLoading(true);
     setTimeout(() => setIsDataLoading(false), 300);
@@ -152,46 +193,12 @@ const RecommendPage = () => {
     setIsFavoriteView(false);
   };
 
-  // 식단 로그 페이지로 이동
   const handleToggleCheck = (food) => {
-    navigate('/dailyLog', { state: { food } });
+    navigate('/home/dailyLog', { state: { food } });
   };
 
-  // 삭제 및 토스트 관련 로직 (기존 기능 유지)
-  const deletedFoodRef = useRef(null);
-  const toastTimerRef = useRef(null);
-  const [toast, setToast] = useState({ visible: false, message: '' });
-
-  const showToast = (message) => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToast({ visible: true, message });
-    toastTimerRef.current = setTimeout(
-      () => setToast({ visible: false, message: '' }),
-      3000,
-    );
-  };
-
-  const handleDelete = (id, name) => {
-    const targetIndex = recommendedFoods.findIndex((f) => f.id === id);
-    deletedFoodRef.current = {
-      food: recommendedFoods[targetIndex],
-      index: targetIndex,
-    };
+  const handleDelete = (id) => {
     setRecommendedFoods((prev) => prev.filter((f) => f.id !== id));
-    showToast(`${name}이(가) 삭제되었습니다.`);
-  };
-
-  const handleUndo = () => {
-    if (deletedFoodRef.current) {
-      const { food, index } = deletedFoodRef.current;
-      setRecommendedFoods((prev) => {
-        const newList = [...prev];
-        newList.splice(index, 0, food);
-        return newList;
-      });
-      setToast({ visible: false, message: '' });
-      deletedFoodRef.current = null;
-    }
   };
 
   // 필터링 및 정렬 로직
@@ -209,21 +216,25 @@ const RecommendPage = () => {
       return matchesSearch && matchesTags && matchesFavorite;
     })
     .sort((a, b) => {
+      // 이름순 (ㄱ~ㅎ)
       if (sortType === 'name') return a.name.localeCompare(b.name, 'ko');
-      if (sortType === 'namereverse') return b.name.localeCompare(a.name, 'ko');
+
+      // 오래된순 (ID 오름차순)
       if (sortType === 'oldest') return a.id - b.id;
+
+      // 최신순 (기본값: ID 내림차순)
       return b.id - a.id;
     });
 
   return (
-    <div className="flex p-4 gap-4 text-[#1E2923] bg-gray-50 h-[92vh] max-h-[1000px] overflow-hidden">
+    <div className="flex w-full p-4 gap-4 text-[#1E2923] bg-gray-50 h-[92vh] max-h-[1000px] overflow-hidden">
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #FF8203; border-radius: 10px; }
       `}</style>
 
-      {/* 좌측: AI 챗봇 영역 */}
+      {/* 좌측: AI 챗봇 영역 (비율 1) */}
       <div className="flex-1 bg-white rounded-2xl border border-gray-100 flex flex-col overflow-hidden shadow-sm">
         <div className="p-4 border-b border-gray-100 bg-white shrink-0">
           <h2 className="font-bold flex items-center gap-2">
@@ -252,25 +263,25 @@ const RecommendPage = () => {
             </div>
           ))}
           {isLoading && (
-            <div className="p-3 px-4 rounded-2xl shadow-sm text-sm text-gray-400 bg-white border border-gray-100 rounded-tl-none animate-pulse">
+            <div className="p-3 px-4 rounded-2xl shadow-sm text-sm text-gray-400 bg-white border border-gray-100 rounded-tl-none animate-pulse max-w-[85%]">
               AI가 최적의 식단을 분석 중입니다...
             </div>
           )}
         </div>
-        <div className="p-3 bg-white border-t border-gray-100">
+        <div className="p-3 bg-white border-t border-gray-100 shrink-0">
           <div className="flex gap-2">
             <input
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-              placeholder="음식 이름이나 영양 고민을 입력하세요..."
+              placeholder="음식 이름이나 영양 고민을 입력하세요 ..."
               className="flex-1 p-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-[#FF8243] text-sm"
             />
             <button
               onClick={sendMessage}
               disabled={isLoading}
-              className="bg-[#FF8243] text-white px-5 rounded-xl text-sm font-medium disabled:bg-gray-300"
+              className="bg-[#FF8243] text-white px-5 rounded-xl text-sm font-medium disabled:bg-gray-300 hover:bg-[#e6753d]"
             >
               전송
             </button>
@@ -278,14 +289,15 @@ const RecommendPage = () => {
         </div>
       </div>
 
-      {/* 우측: 검색 및 카드 리스트 영역 */}
-      <div className="flex-1 flex flex-col overflow-hidden relative">
-        <div className="shrink-0 space-y-2 mb-2 px-1">
+      {/* 우측: 리스트 영역 */}
+      <div className="flex-2 flex flex-col min-w-0 h-full overflow-hidden relative pt-1">
+        {/* 상단 검색 및 필터 바 (고정 높이) */}
+        <div className="shrink-0 space-y-2 mb-3 px-2">
           <div className="flex gap-2 items-center">
             <div className="flex-1 relative">
               <input
                 type="text"
-                placeholder="식단 검색..."
+                placeholder="식단 검색 ..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -310,7 +322,7 @@ const RecommendPage = () => {
             </button>
           </div>
 
-          <div className="flex items-center gap-2 overflow-hidden">
+          <div className="flex items-center gap-2">
             <button
               onClick={resetFilters}
               className="p-2 bg-white border border-gray-200 rounded-lg hover:text-[#FF8243] transition-colors shrink-0"
@@ -332,70 +344,91 @@ const RecommendPage = () => {
                 </button>
               ))}
             </div>
-            <div className="relative shrink-0">
-              <select
-                value={sortType}
-                onChange={(e) => setSortType(e.target.value)}
-                className="appearance-none pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded-lg text-[13px] font-medium focus:outline-none cursor-pointer"
+
+            {/* 우측 리스트 상단 정렬 드롭다운 부분 (약 235행 부근) */}
+            <div className="relative shrink-0" ref={sortRef}>
+              {/* 드롭다운 실행 버튼 */}
+              <button
+                onClick={() => setIsSortOpen(!isSortOpen)}
+                className="flex items-center justify-between gap-2 pl-4 pr-3 py-2.5 bg-white border border-gray-100 rounded-xl text-[14px] font-semibold text-gray-700 shadow-sm hover:border-[#FF8243] hover:shadow-md transition-all min-w-[190px]"
               >
-                <option value="latest">최신순</option>
-                <option value="oldest">오래된순</option>
-                <option value="name">이름순(ㄱ~ㅎ)</option>
-                <option value="namereverse">이름순(ㅎ~ㄱ)</option>
-              </select>
-              <div className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                <LuPanelTopOpen size={18} />
-              </div>
+                <div className="flex items-center gap-2">
+                  <LuArrowDownUp size={17} className="text-[#FF8243] mr-1" />
+                  <span className="text-[13px]">
+                    {sortType === 'latest'
+                      ? '최신순'
+                      : sortType === 'oldest'
+                        ? '오래된순'
+                        : sortType === 'name'
+                          ? '이름순(ㄱ-ㅎ)'
+                          : '이름순(ㅎ-ㄱ)'}
+                  </span>
+                </div>
+              </button>
+
+              {/* 펼쳐지는 메뉴 영역 */}
+              {isSortOpen && (
+                <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-100 rounded-xl shadow-xl z-100 overflow-hidden animate-slide-down">
+                  <div className="">
+                    {[
+                      { label: '최신순', value: 'latest' },
+                      { label: '오래된순', value: 'oldest' },
+                      { label: '이름순 (ㄱ-ㅎ)', value: 'name' },
+                      { label: '이름순 (ㅎ-ㄱ)', value: 'namereverse' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => {
+                          setSortType(opt.value);
+                          setIsSortOpen(false);
+                          triggerLoading();
+                        }}
+                        className={`w-full flex items-center justify-between px-4 py-2.5 text-[13px] transition-colors hover:bg-gray-50 ${
+                          sortType === opt.value
+                            ? 'text-[#FF8243] font-bold bg-orange-100/50'
+                            : 'text-gray-600'
+                        }`}
+                      >
+                        {opt.label}
+                        {sortType === opt.value && <LuCheck size={14} />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="flex-1 bg-[#F9FBFA] overflow-y-auto pr-1 custom-scrollbar relative">
+        {/* 결과 리스트 영역 */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-2 custom-scrollbar relative">
           {isDataLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-50/50 z-10">
+            <div className="sticky top-0 inset-x-0 h-full flex items-center justify-center bg-gray-50/50 z-20">
               <div className="w-8 h-8 border-4 border-[#FF8243] border-t-transparent rounded-full animate-spin"></div>
             </div>
           )}
+
           {displayFoods.length > 0 ? (
-            <div className="grid grid-cols-2 gap-3 pb-4">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
               {displayFoods.map((food) => (
                 <FoodCardRecommend
                   key={food.id}
                   food={food}
                   isFavorite={favorites.includes(food.id)}
                   onToggleFavorite={() => toggleFavorite(food.id)}
-                  onDelete={() => handleDelete(food.id, food.name)}
+                  onDelete={() => handleDelete(food.id)}
                   onToggleCheck={() => handleToggleCheck(food)}
                 />
               ))}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-20 text-gray-400 bg-white rounded-2xl border border-dashed border-gray-200">
-              <p className="text-sm font-medium">검색 결과가 없습니다.</p>
-              <button
-                onClick={resetFilters}
-                className="mt-2 text-xs text-[#FF8243] underline"
-              >
-                초기화
-              </button>
-            </div>
+            !isDataLoading && (
+              <div className="flex flex-col items-center justify-center py-20 text-gray-400 bg-white rounded-2xl border border-dashed border-gray-200">
+                <p className="text-sm font-medium">검색 결과가 없습니다.</p>
+              </div>
+            )
           )}
         </div>
-
-        {/* 토스트 알림 */}
-        {toast.visible && (
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 animate-bounce">
-            <div className="bg-[#1E2923]/90 backdrop-blur-sm text-white px-6 py-3 rounded-2xl flex items-center gap-4 shadow-xl">
-              <span className="text-sm font-medium">{toast.message}</span>
-              <button
-                onClick={handleUndo}
-                className="text-[#FF8243] text-sm font-bold border-l border-gray-600 pl-4"
-              >
-                취소
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
