@@ -121,11 +121,19 @@ const Sidebar = () => {
           <div className="mt-3 mx-1 p-3 rounded-2xl bg-[#ff8d54] shadow-[0_4px_16px_rgba(0,0,0,0.2)]">
             <div className="flex items-center gap-3">
               {/* 아바타 */}
-              <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-md">
-                <span className="text-[#ff8243] font-bold text-sm">
-                  {(profile?.nickname || user?.nickname || '사용자').charAt(0).toUpperCase()}
-                </span>
-              </div>
+              {profile?.profileImage ? (
+                <img
+                  src={profile.profileImage}
+                  alt="프로필"
+                  className="w-10 h-10 rounded-full object-cover shadow-md border-2 border-white/50"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-md">
+                  <span className="text-[#ff8243] font-bold text-sm">
+                    {(profile?.nickname || user?.nickname || '사용자').charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              )}
               {/* 사용자 정보 */}
               <div className="flex-1 min-w-0">
                 <p className="text-white font-semibold text-sm truncate drop-shadow-sm">
