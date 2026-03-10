@@ -1,42 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
+import { userApi } from '../api/auth';
 
 const STORAGE_KEY = 'notificationEnabled';
-
-// 알림 설정 조회 API (GET /api/users/me/notification-settings)
-async function getNotificationSettingsApi() {
-  const token = localStorage.getItem('accessToken');
-  const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/me/notification-settings`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-    },
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data.message ?? `요청 실패 (${res.status})`);
-  }
-  return data;
-}
-
-// 알림 설정 업데이트 API (PUT /api/users/me/notification-settings)
-async function updateNotificationSettingsApi(enabled) {
-  const token = localStorage.getItem('accessToken');
-  const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/me/notification-settings`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-    },
-    body: JSON.stringify({ pushEnabled: enabled }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data.message ?? `요청 실패 (${res.status})`);
-  }
-  return data;
-}
 
 const NotificationContext = createContext(null);
 
@@ -53,9 +19,9 @@ export function NotificationProvider({ children }) {
   const fetchNotificationSettings = useCallback(async () => {
     if (!user) return;
     try {
-      const data = await getNotificationSettingsApi();
+      const data = await userApi.getNotificationSettings();
       const userData = data.data || data;
-      const serverEnabled = userData.pushEnabled ?? true;
+      const serverEnabled = userData.receiveNotifications ?? true;
       setEnabledState(serverEnabled);
       localStorage.setItem(STORAGE_KEY, String(serverEnabled));
     } catch (err) {
@@ -78,7 +44,9 @@ export function NotificationProvider({ children }) {
     if (user) {
       setLoading(true);
       try {
-        await updateNotificationSettingsApi(value);
+        console.log('PUT /api/users/me/notification-settings 요청:', { receiveNotifications: value });
+        const response = await userApi.updateNotificationSettings(value);
+        console.log('PUT /api/users/me/notification-settings 응답:', response);
       } catch (err) {
         console.error('알림 설정 업데이트 실패:', err);
       } finally {
