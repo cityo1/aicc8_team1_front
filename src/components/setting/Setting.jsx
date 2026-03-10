@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authApi, userApi } from '../../api/auth';
 import { useAuth } from '../../contexts/AuthContext';
@@ -23,6 +23,8 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  Avatar,
+  IconButton,
 } from '@mui/material';
 import {
   TagFacesOutlined,
@@ -38,6 +40,8 @@ import {
   PersonRemove,
   Save,
   Restore,
+  CameraAlt,
+  Delete,
 } from '@mui/icons-material';
 
 // ─── 목표 / 식이 제한 옵션 (RegisterPage와 동일) ─────────────────────────────
@@ -248,7 +252,8 @@ function CheckboxGrid({ options, selected, onChange }) {
 export default function Setting() {
   const navigate = useNavigate();
   const auth = useAuth();
-  const { profile, updateProfile, fetchProfile } = useProfile();
+  const { profile, updateProfile, fetchProfile, setProfileImage } =
+    useProfile();
   const { notificationEnabled, setNotificationEnabled, notificationLoading } =
     useNotification();
 
@@ -261,6 +266,7 @@ export default function Setting() {
   const [typeSettings, setTypeSettings] = useState({});
   const [typeSettingsLoading, setTypeSettingsLoading] = useState(false);
   const [typeSettingsSaving, setTypeSettingsSaving] = useState(false);
+  const fileInputRef = useRef(null);
 
   // 로컬 form 상태 (수정하기 버튼 누르기 전까지 sidebar에 반영되지 않음)
   const [form, setForm] = useState({
@@ -332,7 +338,9 @@ export default function Setting() {
     });
     setTypeSettings(defaults);
     setError('');
-    setInfoMessage('기본값으로 초기화되었습니다. 저장하려면 "알림 설정 저장"을 눌러주세요.');
+    setInfoMessage(
+      '기본값으로 초기화되었습니다. 저장하려면 "알림 설정 저장"을 눌러주세요.',
+    );
   };
 
   const handleSaveTypeSettings = async () => {
@@ -377,6 +385,33 @@ export default function Setting() {
   const handleFormChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     setError('');
+  };
+
+  // 프로필 이미지 선택 핸들러
+  const handleImageSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // 파일 크기 체크 (2MB 제한)
+      if (file.size > 2 * 1024 * 1024) {
+        setError('이미지 크기는 2MB 이하여야 합니다.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setProfileImage(event.target.result);
+        setInfoMessage('프로필 사진이 변경되었습니다.');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // 프로필 이미지 삭제 핸들러
+  const handleImageRemove = () => {
+    setProfileImage(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    setInfoMessage('프로필 사진이 삭제되었습니다.');
   };
 
   const handleSaveProfile = async () => {
@@ -459,6 +494,98 @@ export default function Setting() {
           >
             프로필 정보
           </Typography>
+
+          {/* 프로필 사진 */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 3 }}>
+            <Box sx={{ position: 'relative' }}>
+              <Avatar
+                src={profile.profileImage}
+                sx={{
+                  width: 100,
+                  height: 100,
+                  bgcolor: '#ff8243',
+                  fontSize: '2rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  border: '3px solid #fff',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                }}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {!profile.profileImage &&
+                  (form.nickname || '사용자').charAt(0).toUpperCase()}
+              </Avatar>
+              <IconButton
+                size="small"
+                onClick={() => fileInputRef.current?.click()}
+                sx={{
+                  position: 'absolute',
+                  bottom: -4,
+                  right: -4,
+                  bgcolor: '#ff8243',
+                  color: '#fff',
+                  width: 28,
+                  height: 28,
+                  '&:hover': { bgcolor: '#e05a1f' },
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                }}
+              >
+                <CameraAlt sx={{ fontSize: 16 }} />
+              </IconButton>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                style={{ display: 'none' }}
+              />
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <Typography
+                variant="body2"
+                fontWeight={600}
+                color="text.primary"
+                mb={0.5}
+              >
+                프로필 사진
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                display="block"
+                mb={1}
+              >
+                JPG, PNG 형식 (최대 2MB)
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => fileInputRef.current?.click()}
+                  sx={{
+                    fontSize: '0.75rem',
+                    borderColor: '#e2e8f0',
+                    color: 'text.secondary',
+                    '&:hover': { borderColor: '#ff8243', color: '#ff8243' },
+                  }}
+                >
+                  사진 변경
+                </Button>
+                {profile.profileImage && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="error"
+                    onClick={handleImageRemove}
+                    startIcon={<Delete sx={{ fontSize: 14 }} />}
+                    sx={{ fontSize: '0.75rem' }}
+                  >
+                    삭제
+                  </Button>
+                )}
+              </Box>
+            </Box>
+          </Box>
 
           {/* 닉네임 */}
           <TextField
@@ -605,7 +732,14 @@ export default function Setting() {
             알림 설정
           </Typography>
 
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              mb: 3,
+            }}
+          >
             <Typography variant="body2" color="text.secondary">
               전체 알림 ON/OFF
             </Typography>
@@ -637,134 +771,208 @@ export default function Setting() {
 
           {notificationEnabled && (
             <>
-          <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ mb: 2 }}>
-            알림 유형별 설정
-          </Typography>
+              <Typography
+                variant="body2"
+                fontWeight={600}
+                color="text.secondary"
+                sx={{ mb: 2 }}
+              >
+                알림 유형별 설정
+              </Typography>
 
-          {typeSettingsLoading ? (
-            <Typography variant="body2" color="text.disabled" sx={{ py: 2 }}>
-              로딩 중...
-            </Typography>
-          ) : (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mb: 3 }}>
-              {NOTIFICATION_TYPE_CONFIG.map(({ type, label, description, configFields }) => (
+              {typeSettingsLoading ? (
+                <Typography
+                  variant="body2"
+                  color="text.disabled"
+                  sx={{ py: 2 }}
+                >
+                  로딩 중...
+                </Typography>
+              ) : (
                 <Box
-                  key={type}
                   sx={{
-                    p: 2,
-                    borderRadius: 2,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    bgcolor: getTypeEnabled(type) ? 'transparent' : 'action.hover',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 3,
+                    mb: 3,
                   }}
                 >
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'flex-start',
-                      flexWrap: 'wrap',
-                      gap: 1,
-                    }}
-                  >
-                    <Box>
-                      <Typography variant="body2" fontWeight={700}>
-                        {label}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                        {description}
-                      </Typography>
-                    </Box>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          size="small"
-                          checked={getTypeEnabled(type)}
-                          onChange={(e) =>
-                            handleTypeSettingChange(type, 'enabled', e.target.checked)
-                          }
+                  {NOTIFICATION_TYPE_CONFIG.map(
+                    ({ type, label, description, configFields }) => (
+                      <Box
+                        key={type}
+                        sx={{
+                          p: 2,
+                          borderRadius: 2,
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          bgcolor: getTypeEnabled(type)
+                            ? 'transparent'
+                            : 'action.hover',
+                        }}
+                      >
+                        <Box
                           sx={{
-                            '& .MuiSwitch-switchBase.Mui-checked': { color: '#FF8243' },
-                            '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                              backgroundColor: '#FF8243',
-                            },
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            flexWrap: 'wrap',
+                            gap: 1,
                           }}
-                        />
-                      }
-                      label=""
-                    />
-                  </Box>
-                  {configFields && configFields.length > 0 && getTypeEnabled(type) && (
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 2 }}>
-                      {configFields.map(({ key, label: fieldLabel, default: defaultVal, inputType }) =>
-                        inputType === 'dayOfWeek' ? (
-                          <FormControl key={key} size="small" sx={{ minWidth: 120 }}>
-                            <InputLabel>{fieldLabel}</InputLabel>
-                            <Select
-                              value={Number(getTypeSettingValue(type, key, defaultVal))}
-                              label={fieldLabel}
-                              onChange={(e) =>
-                                handleTypeSettingChange(type, key, e.target.value)
-                              }
+                        >
+                          <Box>
+                            <Typography variant="body2" fontWeight={700}>
+                              {label}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ display: 'block', mt: 0.5 }}
                             >
-                              {DAY_NAMES.map((d) => (
-                                <MenuItem key={d.value} value={d.value}>
-                                  {d.label}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          </FormControl>
-                        ) : (
-                          <TextField
-                            key={key}
-                            type="time"
-                            label={fieldLabel}
-                            value={getTypeSettingValue(type, key, defaultVal)}
-                            onChange={(e) =>
-                              handleTypeSettingChange(type, key, e.target.value)
+                              {description}
+                            </Typography>
+                          </Box>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                size="small"
+                                checked={getTypeEnabled(type)}
+                                onChange={(e) =>
+                                  handleTypeSettingChange(
+                                    type,
+                                    'enabled',
+                                    e.target.checked,
+                                  )
+                                }
+                                sx={{
+                                  '& .MuiSwitch-switchBase.Mui-checked': {
+                                    color: '#FF8243',
+                                  },
+                                  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track':
+                                    {
+                                      backgroundColor: '#FF8243',
+                                    },
+                                }}
+                              />
                             }
-                            size="small"
-                            InputLabelProps={{ shrink: true }}
-                            inputProps={{ step: 300 }}
-                            sx={{ maxWidth: 150, ...textFieldFocusStyle }}
+                            label=""
                           />
-                        )
-                      )}
-                    </Box>
+                        </Box>
+                        {configFields &&
+                          configFields.length > 0 &&
+                          getTypeEnabled(type) && (
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                gap: 2,
+                                mt: 2,
+                              }}
+                            >
+                              {configFields.map(
+                                ({
+                                  key,
+                                  label: fieldLabel,
+                                  default: defaultVal,
+                                  inputType,
+                                }) =>
+                                  inputType === 'dayOfWeek' ? (
+                                    <FormControl
+                                      key={key}
+                                      size="small"
+                                      sx={{ minWidth: 120 }}
+                                    >
+                                      <InputLabel>{fieldLabel}</InputLabel>
+                                      <Select
+                                        value={Number(
+                                          getTypeSettingValue(
+                                            type,
+                                            key,
+                                            defaultVal,
+                                          ),
+                                        )}
+                                        label={fieldLabel}
+                                        onChange={(e) =>
+                                          handleTypeSettingChange(
+                                            type,
+                                            key,
+                                            e.target.value,
+                                          )
+                                        }
+                                      >
+                                        {DAY_NAMES.map((d) => (
+                                          <MenuItem
+                                            key={d.value}
+                                            value={d.value}
+                                          >
+                                            {d.label}
+                                          </MenuItem>
+                                        ))}
+                                      </Select>
+                                    </FormControl>
+                                  ) : (
+                                    <TextField
+                                      key={key}
+                                      type="time"
+                                      label={fieldLabel}
+                                      value={getTypeSettingValue(
+                                        type,
+                                        key,
+                                        defaultVal,
+                                      )}
+                                      onChange={(e) =>
+                                        handleTypeSettingChange(
+                                          type,
+                                          key,
+                                          e.target.value,
+                                        )
+                                      }
+                                      size="small"
+                                      InputLabelProps={{ shrink: true }}
+                                      inputProps={{ step: 300 }}
+                                      sx={{
+                                        maxWidth: 150,
+                                        ...textFieldFocusStyle,
+                                      }}
+                                    />
+                                  ),
+                              )}
+                            </Box>
+                          )}
+                      </Box>
+                    ),
                   )}
                 </Box>
-              ))}
-            </Box>
-          )}
+              )}
 
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={handleResetTypeSettings}
-              startIcon={<Restore />}
-              sx={{
-                borderColor: '#e2e8f0',
-                color: 'text.secondary',
-                '&:hover': { borderColor: '#94a3b8', bgcolor: '#f8fafc' },
-              }}
-            >
-              알림 설정 초기화
-            </Button>
-            <Button
-              variant="contained"
-              size="small"
-              onClick={handleSaveTypeSettings}
-              disabled={typeSettingsLoading || typeSettingsSaving}
-              startIcon={<Save />}
-              sx={{
-                bgcolor: '#FF8243',
-                '&:hover': { bgcolor: '#E05A1F' },
-              }}
-            >
-              {typeSettingsSaving ? '저장 중...' : '알림 설정 저장'}
-            </Button>
-          </Box>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleResetTypeSettings}
+                  startIcon={<Restore />}
+                  sx={{
+                    borderColor: '#e2e8f0',
+                    color: 'text.secondary',
+                    '&:hover': { borderColor: '#94a3b8', bgcolor: '#f8fafc' },
+                  }}
+                >
+                  알림 설정 초기화
+                </Button>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={handleSaveTypeSettings}
+                  disabled={typeSettingsLoading || typeSettingsSaving}
+                  startIcon={<Save />}
+                  sx={{
+                    bgcolor: '#FF8243',
+                    '&:hover': { bgcolor: '#E05A1F' },
+                  }}
+                >
+                  {typeSettingsSaving ? '저장 중...' : '알림 설정 저장'}
+                </Button>
+              </Box>
             </>
           )}
         </Box>

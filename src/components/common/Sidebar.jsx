@@ -110,50 +110,68 @@ const Sidebar = () => {
         ))}
       </nav>
 
-      <div className="border-t border-[#f2f9f5]/30 pt-6 pb-6 space-y-1 shrink-0">
+      <div className="border-t border-[#f2f9f5]/20 pt-4 pb-4 space-y-2 shrink-0">
         {bottomItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
             className={({ isActive }) =>
-              `w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors ${isActive ? 'font-bold' : ''}`
+              `w-full flex items-center gap-3 px-4 py-2.5 text-sm rounded-lg transition-all duration-200 ${
+                isActive
+                  ? 'bg-white/15 font-semibold'
+                  : 'hover:bg-white/10'
+              }`
             }
-            style={{ color: 'var(--color-background)' }}
+            style={{ color: '#f2f9f5' }}
           >
             {item.icon} <span>{item.label}</span>
           </NavLink>
         ))}
 
-        {/* 로그인/로그아웃 영역 */}
+        {/* 사용자 프로필 카드 */}
         {isAuthenticated ? (
-          <div className="pt-2">
-            <div
-              className="flex items-center gap-3 px-4 py-2 text-sm"
-              style={{ color: 'var(--color-background)' }}
-            >
-              <User size={18} />
-              <span className="font-semibold">
-                {profile?.nickname || user?.nickname || '사용자'}
-              </span>
+          <div className="mt-3 mx-1 p-3 rounded-2xl bg-[#ff8d54] shadow-[0_4px_16px_rgba(0,0,0,0.2)]">
+            <div className="flex items-center gap-3">
+              {/* 아바타 */}
+              {profile?.profileImage ? (
+                <img
+                  src={profile.profileImage}
+                  alt="프로필"
+                  className="w-10 h-10 rounded-full object-cover shadow-md border-2 border-white/50"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-md">
+                  <span className="text-[#ff8243] font-bold text-sm">
+                    {(profile?.nickname || user?.nickname || '사용자').charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              )}
+              {/* 사용자 정보 */}
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-semibold text-sm truncate drop-shadow-sm">
+                  {profile?.nickname || user?.nickname || '사용자'}
+                </p>
+                <p className="text-white/80 text-xs truncate">
+                  {user?.email || '환영합니다'}
+                </p>
+              </div>
             </div>
+            {/* 로그아웃 버튼 */}
             <button
               onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors hover:bg-[#f2f9f5]/10 rounded-lg"
-              style={{ color: 'var(--color-background)' }}
+              className="w-full mt-3 flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium rounded-xl bg-white/25 hover:bg-white/35 text-white transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
             >
-              <LogOut size={18} />
+              <LogOut size={14} />
               <span>로그아웃</span>
             </button>
           </div>
         ) : (
           <NavLink
             to="/login"
-            className={({ isActive }) =>
-              `w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors ${isActive ? 'font-bold' : ''}`
-            }
-            style={{ color: 'var(--color-background)' }}
+            className="mt-3 mx-1 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-[#ff8d54] hover:bg-[#ff9a6c] text-white font-semibold text-sm shadow-[0_4px_16px_rgba(0,0,0,0.2)] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
           >
-            <User size={18} /> <span>로그인</span>
+            <User size={18} />
+            <span>로그인</span>
           </NavLink>
         )}
       </div>
