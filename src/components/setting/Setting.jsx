@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../../api/auth';
 import { useAuth } from '../../contexts/AuthContext';
@@ -19,6 +19,8 @@ import {
   DialogContentText,
   DialogActions,
   Alert,
+  Avatar,
+  IconButton,
 } from '@mui/material';
 import {
   TagFacesOutlined,
@@ -33,6 +35,8 @@ import {
   Logout,
   PersonRemove,
   Save,
+  CameraAlt,
+  Delete,
 } from '@mui/icons-material';
 
 // ─── 목표 / 식이 제한 옵션 (RegisterPage와 동일) ─────────────────────────────
@@ -165,7 +169,7 @@ function CheckboxGrid({ options, selected, onChange }) {
 export default function Setting() {
   const navigate = useNavigate();
   const auth = useAuth();
-  const { profile, updateProfile, fetchProfile } = useProfile();
+  const { profile, updateProfile, fetchProfile, setProfileImage } = useProfile();
   const { notificationEnabled, setNotificationEnabled, notificationLoading } = useNotification();
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -174,6 +178,7 @@ export default function Setting() {
   const [saveLoading, setSaveLoading] = useState(false);
   const [error, setError] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
+  const fileInputRef = useRef(null);
 
   // 로컬 form 상태 (수정하기 버튼 누르기 전까지 sidebar에 반영되지 않음)
   const [form, setForm] = useState({
@@ -204,6 +209,33 @@ export default function Setting() {
   const handleFormChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     setError('');
+  };
+
+  // 프로필 이미지 선택 핸들러
+  const handleImageSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // 파일 크기 체크 (2MB 제한)
+      if (file.size > 2 * 1024 * 1024) {
+        setError('이미지 크기는 2MB 이하여야 합니다.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setProfileImage(event.target.result);
+        setInfoMessage('프로필 사진이 변경되었습니다.');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // 프로필 이미지 삭제 핸들러
+  const handleImageRemove = () => {
+    setProfileImage(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    setInfoMessage('프로필 사진이 삭제되었습니다.');
   };
 
   const handleSaveProfile = async () => {
@@ -286,6 +318,87 @@ export default function Setting() {
           >
             프로필 정보
           </Typography>
+
+          {/* 프로필 사진 */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 3 }}>
+            <Box sx={{ position: 'relative' }}>
+              <Avatar
+                src={profile.profileImage}
+                sx={{
+                  width: 100,
+                  height: 100,
+                  bgcolor: '#ff8243',
+                  fontSize: '2rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  border: '3px solid #fff',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                }}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {!profile.profileImage && (form.nickname || '사용자').charAt(0).toUpperCase()}
+              </Avatar>
+              <IconButton
+                size="small"
+                onClick={() => fileInputRef.current?.click()}
+                sx={{
+                  position: 'absolute',
+                  bottom: -4,
+                  right: -4,
+                  bgcolor: '#ff8243',
+                  color: '#fff',
+                  width: 28,
+                  height: 28,
+                  '&:hover': { bgcolor: '#e05a1f' },
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                }}
+              >
+                <CameraAlt sx={{ fontSize: 16 }} />
+              </IconButton>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                style={{ display: 'none' }}
+              />
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="body2" fontWeight={600} color="text.primary" mb={0.5}>
+                프로필 사진
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+                JPG, PNG 형식 (최대 2MB)
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => fileInputRef.current?.click()}
+                  sx={{
+                    fontSize: '0.75rem',
+                    borderColor: '#e2e8f0',
+                    color: 'text.secondary',
+                    '&:hover': { borderColor: '#ff8243', color: '#ff8243' },
+                  }}
+                >
+                  사진 변경
+                </Button>
+                {profile.profileImage && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="error"
+                    onClick={handleImageRemove}
+                    startIcon={<Delete sx={{ fontSize: 14 }} />}
+                    sx={{ fontSize: '0.75rem' }}
+                  >
+                    삭제
+                  </Button>
+                )}
+              </Box>
+            </Box>
+          </Box>
 
           {/* 닉네임 */}
           <TextField
