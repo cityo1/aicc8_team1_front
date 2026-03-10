@@ -495,6 +495,10 @@ const EMPTY_FOOD = () => ({
     servingSize: '',  // 1회 제공량 (g)
     foodCode: '',
     nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 },
+    // 기준값 (API 원본 값, g 변경 시 비율 계산에 사용)
+    baseServingSize: 0,
+    baseCalories: 0,
+    baseNutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 },
     image: null,      // 미리보기용 base64
     imageFile: null,  // 서버 전송용 File 객체
 });
@@ -514,7 +518,28 @@ function AddRecordCard({ onRefresh, userId, selectedDate }) {
 
     const handleFoodChange = (index, field, value) => {
         setFoods((prev) =>
-            prev.map((f, i) => (i === index ? { ...f, [field]: value } : f)),
+            prev.map((f, i) => {
+                if (i !== index) return f;
+
+                // servingSize 변경 시 비율에 따라 영양소 재계산
+                if (field === 'servingSize' && f.baseServingSize > 0) {
+                    const newServingSize = Number(value) || 0;
+                    const ratio = newServingSize / f.baseServingSize;
+                    return {
+                        ...f,
+                        servingSize: value,
+                        calories: Math.round(f.baseCalories * ratio),
+                        nutrients: {
+                            carbs: Number((f.baseNutrients.carbs * ratio).toFixed(2)),
+                            protein: Number((f.baseNutrients.protein * ratio).toFixed(2)),
+                            fat: Number((f.baseNutrients.fat * ratio).toFixed(2)),
+                            sugar: Number((f.baseNutrients.sugar * ratio).toFixed(2)),
+                        },
+                    };
+                }
+
+                return { ...f, [field]: value };
+            }),
         );
     };
 
@@ -526,7 +551,7 @@ function AddRecordCard({ onRefresh, userId, selectedDate }) {
 
                 // nutrientsData에서 foodCode, servingSize 추출
                 const foodCode = nutrientsData?.foodCode || f.foodCode;
-                const servingSize = nutrientsData?.servingSize || f.servingSize;
+                const servingSize = nutrientsData?.servingSize || 0;
                 const nutrients = nutrientsData
                     ? {
                         carbs: nutrientsData.carbs,
@@ -543,6 +568,10 @@ function AddRecordCard({ onRefresh, userId, selectedDate }) {
                     servingSize: servingSize !== '' ? String(servingSize) : f.servingSize,
                     foodCode,
                     nutrients,
+                    // 기준값 저장 (g 변경 시 비율 계산에 사용)
+                    baseServingSize: servingSize,
+                    baseCalories: Number(calories) || 0,
+                    baseNutrients: { ...nutrients },
                 };
             }),
         );
