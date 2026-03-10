@@ -84,13 +84,14 @@ export default function FoodSearchInput({ value, onChange, sx }) {
     // 검색 결과 선택 핸들러
     const handleSelect = (food) => {
         setInputValue(food.food_name);
-        // 영양소 정보와 food_code도 함께 전달
-        onChange(food.food_name, food.calories, {
+        // 영양소 정보, food_code, serving_size, calories 함께 전달
+        onChange(food.food_name, Math.round(Number(food.calories)) || 0, {
             carbs: Number(food.carbohydrate) || 0,
             protein: Number(food.protein) || 0,
             fat: Number(food.fat) || 0,
             sugar: Number(food.sugars) || 0,
             foodCode: food.food_code,
+            servingSize: Math.round(Number(food.serving_size)) || 0,
         });
         setShowDropdown(false);
         setSearchResults([]);
@@ -207,17 +208,28 @@ export default function FoodSearchInput({ value, onChange, sx }) {
                             >
                                 {food.food_name}
                             </Typography>
-                            <Typography
-                                variant="caption"
-                                sx={{
-                                    color: '#FF8243',
-                                    fontWeight: 700,
-                                    ml: 1,
-                                    flexShrink: 0,
-                                }}
-                            >
-                                {food.calories} kcal
-                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+                                {food.serving_size > 0 && (
+                                    <Typography
+                                        variant="caption"
+                                        sx={{
+                                            color: '#66BB6A',
+                                            fontWeight: 600,
+                                        }}
+                                    >
+                                        {Math.round(food.serving_size)}g
+                                    </Typography>
+                                )}
+                                <Typography
+                                    variant="caption"
+                                    sx={{
+                                        color: '#FF8243',
+                                        fontWeight: 700,
+                                    }}
+                                >
+                                    {Math.round(Number(food.calories)) || 0} kcal
+                                </Typography>
+                            </Box>
                         </Box>
                     ))}
                 </Paper>
