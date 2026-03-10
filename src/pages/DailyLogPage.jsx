@@ -137,6 +137,7 @@ function transformApiResponse(apiData) {
                 calories: f.calories || 0,
                 nutrients: f.nutrients || { carbs: 0, protein: 0, fat: 0, sugar: 0 },
                 image: getFullImageUrl(f.imageUrl),
+                aiScanId: f.aiScanId || null,
             })),
             nutrients: meal.nutrients || { carbs: 0, protein: 0, fat: 0, sugar: 0 },
             memos: allMemos, // 메모 배열로 저장
@@ -191,8 +192,9 @@ function MealCard({ meal, data, isToday, dateStr, nutrientConfig }) {
     // 저장된 메모 배열
     const savedMemos = data?.memos || [];
 
-    // 음식 중 사진이 있는 항목들 필터링
-    const foodsWithImages = data?.foods?.filter((f) => f.image) || [];
+    // AI 식단분석에서 기록한 경우: ai_scan_id가 있는 음식이 있고, 동일한 사진을 공유함
+    const aiScanFood = data?.foods?.find((f) => f.aiScanId && f.image);
+    const aiScanImage = aiScanFood?.image || null;
 
     return (
         <Paper
@@ -273,6 +275,31 @@ function MealCard({ meal, data, isToday, dateStr, nutrientConfig }) {
             <Collapse in={open}>
                 <Divider />
                 <Box sx={{ p: 2.5 }}>
+                    {/* AI 분석 사진 (ai_scan_id가 있는 경우 음식목록 위에 한 번만 표시) */}
+                    {aiScanImage && (
+                        <Box sx={{ mb: 2 }}>
+                            <Typography
+                                variant="caption"
+                                fontWeight={600}
+                                color="text.secondary"
+                                sx={{ display: 'block', mb: 0.5 }}
+                            >
+                                AI 분석 사진
+                            </Typography>
+                            <Box
+                                component="img"
+                                src={aiScanImage}
+                                alt="AI 분석 사진"
+                                sx={{
+                                    width: 80,
+                                    height: 80,
+                                    objectFit: 'cover',
+                                    borderRadius: 1.5,
+                                    border: `2px solid ${color}`,
+                                }}
+                            />
+                        </Box>
+                    )}
                     {/* 음식 리스트 */}
                     <Typography
                         variant="body2"
@@ -313,8 +340,8 @@ function MealCard({ meal, data, isToday, dateStr, nutrientConfig }) {
                                             {food.calories} kcal
                                         </Typography>
                                     </Box>
-                                    {/* 사진이 있는 경우에만 표시 */}
-                                    {food.image && (
+                                    {/* 사진: AI 스캔(aiScanId) 음식은 위에서 공통 표시했으므로 제외, 수동 추가 음식만 개별 표시 */}
+                                    {food.image && !food.aiScanId && (
                                         <Box sx={{ mt: 1 }}>
                                             <Box
                                                 component="img"
