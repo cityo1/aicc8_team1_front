@@ -135,6 +135,7 @@ function transformApiResponse(apiData) {
                 id: f.id,
                 name: f.foodName || '알 수 없는 음식',
                 calories: f.calories || 0,
+                servingSize: f.servings || f.servingSize || 0,  // 백엔드는 servings로 반환
                 nutrients: f.nutrients || { carbs: 0, protein: 0, fat: 0, sugar: 0 },
                 image: getFullImageUrl(f.imageUrl),
                 aiScanId: f.aiScanId || null,
@@ -321,7 +322,7 @@ function MealCard({ meal, data, isToday, dateStr, nutrientConfig }) {
                                         border: '1px solid #e8ecf0',
                                     }}
                                 >
-                                    {/* 음식 이름과 칼로리 */}
+                                    {/* 음식 이름, 그램, 칼로리 */}
                                     <Box
                                         sx={{
                                             display: 'flex',
@@ -332,13 +333,24 @@ function MealCard({ meal, data, isToday, dateStr, nutrientConfig }) {
                                         <Typography variant="body2" fontWeight={500}>
                                             {food.name}
                                         </Typography>
-                                        <Typography
-                                            variant="body2"
-                                            color={darkColor}
-                                            fontWeight={700}
-                                        >
-                                            {food.calories} kcal
-                                        </Typography>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                            {food.servingSize > 0 && (
+                                                <Typography
+                                                    variant="body2"
+                                                    color="text.secondary"
+                                                    fontWeight={600}
+                                                >
+                                                    {food.servingSize}g
+                                                </Typography>
+                                            )}
+                                            <Typography
+                                                variant="body2"
+                                                color={darkColor}
+                                                fontWeight={700}
+                                            >
+                                                {food.calories} kcal
+                                            </Typography>
+                                        </Box>
                                     </Box>
                                     {/* 사진: AI 스캔(aiScanId) 음식은 위에서 공통 표시했으므로 제외, 수동 추가 음식만 개별 표시 */}
                                     {food.image && !food.aiScanId && (
@@ -387,63 +399,6 @@ function MealCard({ meal, data, isToday, dateStr, nutrientConfig }) {
                             </Typography>
                         </Box>
                     )}
-
-                    {/* 기존 사진 추가 영역 - 주석처리 */}
-                    {/*
-                    <Typography variant="body2" fontWeight={700} mb={1} color="text.secondary">
-                        사진
-                    </Typography>
-                    <input
-                        type="file"
-                        accept="image/*"
-                        ref={fileInputRef}
-                        onChange={handleImageChange}
-                        style={{ display: 'none' }}
-                    />
-                    {image ? (
-                        <Box sx={{ position: 'relative', mb: 2 }}>
-                            <Box
-                                component="img"
-                                src={image}
-                                alt="식사 사진"
-                                sx={{
-                                    width: '100%',
-                                    maxHeight: 200,
-                                    objectFit: 'cover',
-                                    borderRadius: 2,
-                                    border: `2px solid ${color}`,
-                                }}
-                            />
-                            <IconButton
-                                size="small"
-                                onClick={handleImageRemove}
-                                sx={{
-                                    position: 'absolute',
-                                    top: 8,
-                                    right: 8,
-                                    bgcolor: 'rgba(0,0,0,0.5)',
-                                    color: '#fff',
-                                    '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
-                                }}
-                            >
-                                <DeleteOutline fontSize="small" />
-                            </IconButton>
-                        </Box>
-                    ) : (
-                        <Box
-                            onClick={handleImageClick}
-                            sx={{
-                                border: '2px dashed #e2e8f0', borderRadius: 2, p: 3,
-                                display: 'flex', flexDirection: 'column', alignItems: 'center',
-                                cursor: 'pointer', mb: 2, transition: '0.2s',
-                                '&:hover': { borderColor: color, bgcolor: bg },
-                            }}
-                        >
-                            <AddPhotoAlternate sx={{ fontSize: 32, color: '#cbd5e1', mb: 0.5 }} />
-                            <Typography variant="caption" color="text.disabled">사진을 추가하세요</Typography>
-                        </Box>
-                    )}
-                    */}
 
                     {/* 영양소 */}
                     {data?.nutrients && (
@@ -537,6 +492,7 @@ function MealCard({ meal, data, isToday, dateStr, nutrientConfig }) {
 const EMPTY_FOOD = () => ({
     name: '',
     calories: '',
+    servingSize: '',  // 1회 제공량 (g)
     foodCode: '',
     nutrients: { carbs: 0, protein: 0, fat: 0, sugar: 0 },
     image: null,      // 미리보기용 base64
@@ -562,14 +518,15 @@ function AddRecordCard({ onRefresh, userId, selectedDate }) {
         );
     };
 
-    // 음식 검색에서 선택 시 이름, 칼로리, 영양소, foodCode 동시 업데이트
+    // 음식 검색에서 선택 시 이름, 칼로리, 영양소, foodCode, servingSize 동시 업데이트
     const handleFoodSelect = (index, name, calories, nutrientsData = null) => {
         setFoods((prev) =>
             prev.map((f, i) => {
                 if (i !== index) return f;
 
-                // nutrientsData에서 foodCode 추출
+                // nutrientsData에서 foodCode, servingSize 추출
                 const foodCode = nutrientsData?.foodCode || f.foodCode;
+                const servingSize = nutrientsData?.servingSize || f.servingSize;
                 const nutrients = nutrientsData
                     ? {
                         carbs: nutrientsData.carbs,
@@ -583,6 +540,7 @@ function AddRecordCard({ onRefresh, userId, selectedDate }) {
                     ...f,
                     name,
                     calories: calories !== '' ? String(calories) : f.calories,
+                    servingSize: servingSize !== '' ? String(servingSize) : f.servingSize,
                     foodCode,
                     nutrients,
                 };
@@ -660,6 +618,9 @@ function AddRecordCard({ onRefresh, userId, selectedDate }) {
                     const mealDate = selectedDate || new Date();
                     const localISOString = new Date(mealDate.getTime() - mealDate.getTimezoneOffset() * 60000).toISOString();
                     formData.append('mealTime', localISOString);
+                    // 사용자가 입력한 servingSize와 calories 전송
+                    if (f.servingSize) formData.append('servingSize', f.servingSize);
+                    if (f.calories) formData.append('calories', f.calories);
                     if (memo) formData.append('memo', memo);
                     if (f.imageFile) formData.append('image', f.imageFile);
 
@@ -824,6 +785,29 @@ function AddRecordCard({ onRefresh, userId, selectedDate }) {
                                                 onChange={(name, calories, nutrients) =>
                                                     handleFoodSelect(index, name, calories, nutrients)
                                                 }
+                                            />
+
+                                            {/* 1회 제공량 (g) */}
+                                            <TextField
+                                                size="small"
+                                                placeholder="g"
+                                                type="number"
+                                                value={food.servingSize}
+                                                onChange={(e) =>
+                                                    handleFoodChange(index, 'servingSize', e.target.value)
+                                                }
+                                                sx={{
+                                                    width: 72,
+                                                    '& .MuiOutlinedInput-root': {
+                                                        borderRadius: 1.5,
+                                                        bgcolor: '#fff',
+                                                        fontSize: '0.875rem',
+                                                    },
+                                                    '& .MuiOutlinedInput-notchedOutline': {
+                                                        borderColor: '#e8ecf0',
+                                                    },
+                                                    '& input': { textAlign: 'right' },
+                                                }}
                                             />
 
                                             {/* 칼로리 */}
@@ -1165,79 +1149,79 @@ function CustomCalendar({
                         //     arrow
                         //     placement="top"
                         // >
-                            <Box
-                                key={idx}
-                                onClick={() => !isFuture && onDateSelect(thisDate)}
+                        <Box
+                            key={idx}
+                            onClick={() => !isFuture && onDateSelect(thisDate)}
+                            sx={{
+                                position: 'relative',
+                                aspectRatio: '1',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: 2,
+                                cursor: isFuture ? 'default' : 'pointer',
+                                bgcolor: isSelected
+                                    ? '#FF8243'
+                                    : isToday
+                                        ? '#fff3ed'
+                                        : 'transparent',
+                                border:
+                                    isToday && !isSelected
+                                        ? '2px solid #FF8243'
+                                        : '2px solid transparent',
+                                opacity: isFuture ? 0.3 : 1,
+                                transition: 'all 0.15s',
+                                '&:hover': !isFuture
+                                    ? { bgcolor: isSelected ? '#E05A1F' : '#fff3ed' }
+                                    : {},
+                            }}
+                        >
+                            {isToday && isSelected && (
+                                <CheckCircle
+                                    sx={{
+                                        position: 'absolute',
+                                        top: 2,
+                                        right: 2,
+                                        fontSize: 10,
+                                        color: '#fff',
+                                    }}
+                                />
+                            )}
+                            <Typography
+                                variant="caption"
+                                fontWeight={isToday || isSelected ? 700 : 400}
                                 sx={{
-                                    position: 'relative',
-                                    aspectRatio: '1',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    borderRadius: 2,
-                                    cursor: isFuture ? 'default' : 'pointer',
-                                    bgcolor: isSelected
-                                        ? '#FF8243'
+                                    color: isSelected
+                                        ? '#fff'
                                         : isToday
-                                            ? '#fff3ed'
-                                            : 'transparent',
-                                    border:
-                                        isToday && !isSelected
-                                            ? '2px solid #FF8243'
-                                            : '2px solid transparent',
-                                    opacity: isFuture ? 0.3 : 1,
-                                    transition: 'all 0.15s',
-                                    '&:hover': !isFuture
-                                        ? { bgcolor: isSelected ? '#E05A1F' : '#fff3ed' }
-                                        : {},
+                                            ? '#FF8243'
+                                            : dayOfWeek === 0
+                                                ? '#EF5350'
+                                                : dayOfWeek === 6
+                                                    ? '#5C6BC0'
+                                                    : 'text.primary',
+                                    fontSize: '0.8rem',
+                                    lineHeight: 1,
                                 }}
                             >
-                                {isToday && isSelected && (
-                                    <CheckCircle
-                                        sx={{
-                                            position: 'absolute',
-                                            top: 2,
-                                            right: 2,
-                                            fontSize: 10,
-                                            color: '#fff',
-                                        }}
-                                    />
-                                )}
-                                <Typography
-                                    variant="caption"
-                                    fontWeight={isToday || isSelected ? 700 : 400}
+                                {day}
+                            </Typography>
+                            {hasData && (
+                                <Box
                                     sx={{
-                                        color: isSelected
-                                            ? '#fff'
-                                            : isToday
-                                                ? '#FF8243'
-                                                : dayOfWeek === 0
-                                                    ? '#EF5350'
-                                                    : dayOfWeek === 6
-                                                        ? '#5C6BC0'
-                                                        : 'text.primary',
-                                        fontSize: '0.8rem',
-                                        lineHeight: 1,
+                                        position: 'absolute',
+                                        bottom: { xs: 4, lg: 10 },
+                                        left: '50%',
+                                        transform: 'translateX(-50%)',
+                                        width: 4,
+                                        height: 4,
+                                        borderRadius: '50%',
+                                        bgcolor: isSelected ? 'rgba(255,255,255,0.8)' : '#FF8243',
                                     }}
-                                >
-                                    {day}
-                                </Typography>
-                                {hasData && (
-                                    <Box
-                                        sx={{
-                                            position: 'absolute',
-                                            bottom: { xs: 4, lg: 10 },
-                                            left: '50%',
-                                            transform: 'translateX(-50%)',
-                                            width: 4,
-                                            height: 4,
-                                            borderRadius: '50%',
-                                            bgcolor: isSelected ? 'rgba(255,255,255,0.8)' : '#FF8243',
-                                        }}
-                                    />
-                                )}
-                            </Box>
+                                />
+                            )}
+                        </Box>
                         // </Tooltip>
                     );
                 })}
@@ -1431,7 +1415,7 @@ export default function DailyLogPage() {
 
     // 저장 후 데이터 새로고침
     const handleRefreshData = async () => {
-        console.log('handleRefreshData 호출됨, user:', user, 'selectedDate:', selectedDate);
+        // console.log('handleRefreshData 호출됨, user:', user, 'selectedDate:', selectedDate);
         if (user?.id) {
             await fetchDailyData(selectedDate, user.id);
         }
@@ -1493,7 +1477,7 @@ export default function DailyLogPage() {
                     display: 'flex',
                     gap: 3,
                     p: { xs: 2, md: 3 },
-                    maxWidth: 1100,
+                    maxWidth: 1280,
                     mx: 'auto',
                     alignItems: 'flex-start',
                     flexDirection: { xs: 'column', md: 'row' },
