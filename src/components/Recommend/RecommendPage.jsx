@@ -328,7 +328,7 @@ const RecommendPage = () => {
           ))}
           {isLoading && (
             <div className="p-3 px-4 rounded-2xl shadow-sm text-sm text-gray-400 bg-white border border-gray-100 rounded-tl-none animate-pulse max-w-[85%]">
-              AI가 최적의 식단을 분석 중입니다...
+              AI가 최적의 식단을 분석 중입니다 ...
             </div>
           )}
         </div>

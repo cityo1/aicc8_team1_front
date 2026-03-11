@@ -183,7 +183,7 @@ function HomePage() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-4rem)] min-h-0 overflow-y-auto lg:overflow-hidden">
       {/* Left: Nutrition Score - 3분할 (Circle | Today's Intake | 격려) */}
-      <div className="lg:row-span-2 bg-white rounded-2xl p-4 shadow-sm border border-[var(--color-border)] flex flex-col min-h-0 overflow-hidden">
+      <div className="lg:row-span-2 bg-white rounded-2xl p-4 shadow-sm border border-(--color-border) flex flex-col min-h-0 overflow-hidden">
         <h3
           className="text-lg font-semibold mb-2 shrink-0"
           style={{ color: 'var(--color-text)' }}
@@ -531,10 +531,7 @@ function ActivityScoreChart({ data: scores, summaries, goals }) {
           일별 영양 균형 점수 (0~100점, 높을수록 균형이 좋음)
         </p>
       </div>
-      <div
-        className="flex-1 min-h-0 w-full"
-        style={{ minHeight: 160 }}
-      >
+      <div className="flex-1 min-h-0 w-full" style={{ minHeight: 160 }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={chartData}

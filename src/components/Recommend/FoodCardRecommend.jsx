@@ -163,8 +163,7 @@ const FoodCardRecommend = ({
 
       {/* 태그 영역 */}
       <div className="flex flex-wrap gap-1.5 mb-2 min-h-[26px]">
-        {isLoading ? (
-          // 스켈레톤
+        {isLoading && tags.length === 0 ? (
           <>
             <div className="w-16 h-[26px] bg-gray-100 rounded-md animate-pulse" />
             <div className="w-22 h-[26px] bg-gray-100 rounded-md animate-pulse" />
@@ -174,14 +173,13 @@ const FoodCardRecommend = ({
           tags.map((tag, idx) => (
             <span
               key={idx}
-              className="px-2.5 py-1 bg-gray-100 text-gray-500 text-[12px] font-bold rounded-md flex items-center justify-center"
+              className="px-2.5 py-1 bg-gray-100 text-gray-500 text-[12px] font-bold rounded-md flex items-center justify-center animate-fadeIn"
             >
               {tag}
             </span>
           ))
         )}
       </div>
-
       <div className="h-[1px] bg-white mb-3" />
 
       {/* 하단: 삭제 및 선택 버튼 */}
