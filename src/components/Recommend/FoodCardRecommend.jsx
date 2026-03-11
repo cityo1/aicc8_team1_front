@@ -159,17 +159,30 @@ const FoodCardRecommend = ({
         })}
       </div>
 
+      <div className="h-[1px] bg-gray-100 mb-3" />
+
       {/* 태그 영역 */}
-      <div className="flex flex-wrap gap-1.5 mb-3 min-h-[23px]">
-        {tags.map((tag, idx) => (
-          <span
-            key={idx}
-            className="px-2.5 py-1 bg-gray-100 text-gray-500 text-[12px] font-bold rounded-md items-baseline"
-          >
-            {tag}
-          </span>
-        ))}
+      <div className="flex flex-wrap gap-1.5 mb-3 min-h-[26px]">
+        {isLoading ? (
+          // 스켈레톤
+          <>
+            <div className="w-16 h-[26px] bg-gray-100 rounded-md animate-pulse" />
+            <div className="w-22 h-[26px] bg-gray-100 rounded-md animate-pulse" />
+            <div className="w-10 h-[26px] bg-gray-100 rounded-md animate-pulse" />
+          </>
+        ) : (
+          tags.map((tag, idx) => (
+            <span
+              key={idx}
+              className="px-2.5 py-1 bg-gray-100 text-gray-500 text-[12px] font-bold rounded-md flex items-center justify-center"
+            >
+              {tag}
+            </span>
+          ))
+        )}
       </div>
+
+      <div className="h-[1px] bg-gray-100 mb-3" />
 
       {/* 하단: 삭제 및 선택 버튼 */}
       <div className="flex justify-between items-center">
@@ -188,7 +201,7 @@ const FoodCardRecommend = ({
             e.stopPropagation();
             console.log(food, '비슷한 음식 보기');
           }}
-          className="w-49 py-2 bg-[#ffffff] text-[#FF8243] font-bold rounded-xl shadow-sm border-3 border-[#FF8243] text-[15px] ml-33 hover:bg-gray-50 transition-colors"
+          className="w-43 py-2 bg-[#ffffff] text-[#FF8243] font-bold rounded-xl shadow-sm border-3 border-[#FF8243] text-[15px] ml-17 hover:bg-gray-50 transition-colors"
         >
           비슷한 음식 보기
         </button>

@@ -262,20 +262,33 @@ const RecommendPage = () => {
   };
 
   // 필터링 및 정렬 로직
-  const displayFoods = recommendedFoods.filter((food) => {
-    const matchesSearch = food.name
-      .toLowerCase()
-      .includes(finalSearchTerm.toLowerCase());
-    const matchesTags =
-      selectedTags.length === 0 ||
-      selectedTags.every((tag) =>
-        // food.tags 안에 "#고단백" 처럼 tag("고단백")를 포함한 요소가 있는지 확인
-        food.tags?.some((foodTag) => foodTag.includes(tag)),
-      );
-
-    const matchesFavorite = isFavoriteView ? favorites.includes(food.id) : true;
-    return matchesSearch && matchesTags && matchesFavorite;
-  });
+  const displayFoods = recommendedFoods
+    .filter((food) => {
+      const matchesSearch = food.name
+        .toLowerCase()
+        .includes(finalSearchTerm.toLowerCase());
+      const matchesTags =
+        selectedTags.length === 0 ||
+        selectedTags.every((tag) =>
+          // food.tags 안에 "#고단백" 처럼 tag("고단백")를 포함한 요소가 있는지 확인
+          food.tags?.some((foodTag) => foodTag.includes(tag)),
+        );
+      const matchesFavorite = isFavoriteView
+        ? favorites.includes(food.id)
+        : true;
+      return matchesSearch && matchesTags && matchesFavorite;
+    })
+    .sort((a, b) => {
+      // 실제 정렬 로직 추가
+      if (sortType === 'name') {
+        return a.name.localeCompare(b.name); // 이름순 (ㄱ-ㅎ)
+      } else if (sortType === 'namereverse') {
+        return b.name.localeCompare(a.name); // 이름역순 (ㅎ-ㄱ)
+      } else {
+        // 최신순 (latest):
+        return 0;
+      }
+    });
 
   return (
     <div className="flex w-full p-4 gap-4 text-[#1E2923] bg-gray-50 h-[92vh] max-h-[1000px] overflow-hidden">
