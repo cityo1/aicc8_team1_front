@@ -39,6 +39,7 @@ import {
 import FoodSearchInput from '../components/search/FoodSearchInput';
 import { useAuth } from '../contexts/AuthContext';
 import { useProfile } from '../contexts/ProfileContext';
+import { getNutritionGoals } from '../api/nutrition.js';
 import { calculateMealTargets } from '../components/common/calculateNutritionScore';
 
 // ─── API 기본 URL ──────────────────────────────────────────────────────────
@@ -1259,6 +1260,86 @@ function CustomCalendar({
     );
 }
 
+// ─── 영양 목표 요약 카드 (선택한 날짜 기준, 섭취량/목표 바 형태) ─────────────────
+function NutritionGoalsCard({ selectedDate, data }) {
+    const [goals, setGoals] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        let cancelled = false;
+        async function fetchGoals() {
+            setLoading(true);
+            try {
+                const dateStr = formatDate(selectedDate);
+                const res = await getNutritionGoals(dateStr);
+                if (cancelled) return;
+                setGoals(res?.data ?? null);
+            } catch {
+                if (!cancelled) setGoals(null);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        }
+        fetchGoals();
+        return () => { cancelled = true; };
+    }, [selectedDate]);
+
+    const summary = data?.summary ?? {};
+    const items = goals
+        ? [
+              { label: '칼로리', current: Number(summary.calories) || 0, goal: Number(goals.targetCalories) || 1, unit: 'kcal', color: '#FF8243' },
+              { label: '탄수화물', current: Number(summary.carbs) || 0, goal: Number(goals.targetCarbohydrate) || 1, unit: 'g', color: '#FFA726' },
+              { label: '단백질', current: Number(summary.protein) || 0, goal: Number(goals.targetProtein) || 1, unit: 'g', color: '#66BB6A' },
+              { label: '지방', current: Number(summary.fat) || 0, goal: Number(goals.targetFat) || 1, unit: 'g', color: '#EF5350' },
+              { label: '당류', current: Number(summary.sugar) || 0, goal: Number(goals.targetSugars) || 1, unit: 'g', color: '#AB47BC' },
+          ]
+        : [];
+
+    return (
+        <Box sx={{ mt: 2.5, pt: 2.5, borderTop: '1px dashed #e2e8f0' }}>
+            <Typography variant="body2" fontWeight={700} color="text.secondary" mb={1.5}>
+                🎯 {selectedDate.getMonth() + 1}월 {selectedDate.getDate()}일 영양 목표
+            </Typography>
+            {loading ? (
+                <Typography variant="caption" color="text.secondary">불러오는 중...</Typography>
+            ) : items.length > 0 ? (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    {items.map(({ label, current, goal, unit, color }) => {
+                        const pct = goal > 0 ? Math.min((current / goal) * 100, 100) : 0;
+                        const valueText = unit === 'kcal'
+                            ? `${Math.round(current)} / ${Math.round(goal)} ${unit}`
+                            : `${Number(current).toFixed(1)} / ${Number(goal).toFixed(1)} ${unit}`;
+                        return (
+                            <Box key={label}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.4 }}>
+                                    <Typography variant="caption" color="text.secondary" fontWeight={500}>
+                                        {label}
+                                    </Typography>
+                                    <Typography variant="caption" fontWeight={700} sx={{ color }}>
+                                        {valueText}
+                                    </Typography>
+                                </Box>
+                                <LinearProgress
+                                    variant="determinate"
+                                    value={pct}
+                                    sx={{
+                                        height: 6,
+                                        borderRadius: 4,
+                                        bgcolor: '#f1f5f9',
+                                        '& .MuiLinearProgress-bar': { bgcolor: color, borderRadius: 4 },
+                                    }}
+                                />
+                            </Box>
+                        );
+                    })}
+                </Box>
+            ) : (
+                <Typography variant="caption" color="text.secondary">목표 데이터가 없습니다.</Typography>
+            )}
+        </Box>
+    );
+}
+
 // ─── 영양 요약 (이전 날짜 선택 시 표시) ─────────────────────────────────────
 function NutritionSummaryPanel({ date, data }) {
     const today = new Date();
@@ -1526,6 +1607,7 @@ export default function DailyLogPage() {
                             dayData={dayData}
                             datesWithData={datesWithData}
                         />
+                        <NutritionGoalsCard selectedDate={selectedDate} data={dayData} />
                         <NutritionSummaryPanel date={selectedDate} data={dayData} />
                     </Paper>
                 </Box>
