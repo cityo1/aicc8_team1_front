@@ -1,144 +1,184 @@
-import { useMemo } from 'react';
-import { ChevronRight } from 'lucide-react';
-import { Box, Typography, CircularProgress, LinearProgress, Stack } from '@mui/material';
-import { useProfile } from '../../contexts/ProfileContext';
-import { calculateDailyTargets } from '../common/calculateNutritionScore';
+import { useEffect, useState, useMemo } from 'react';
+import { ChevronRight, Loader2 } from 'lucide-react';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
+import { Link } from 'react-router-dom';
+import {
+  getNutritionGoals,
+  getDailySummary,
+  getDailySummaries,
+  getTodayRecommend,
+} from '../../api/nutrition.js';
 
-// Activity line graph data (Sun-Sat)
-const ACTIVITY_DATA = [65, 82, 45, 90, 70, 95, 78];
+// 최근 7일 fallback (데이터 없을 때)
+const ACTIVITY_DATA_FALLBACK = [0, 0, 0, 0, 0, 0, 0];
 
-// 기본 권장섭취량 (프로필 정보가 없을 때 사용)
-const DEFAULT_TARGETS = {
-  calories: 2100,
-  carbs: 250,
-  protein: 150,
-  fat: 60,
-  sugar: 50,
-};
-
-// 영양소별 색상 설정
-const NUTRIENT_COLORS = {
-  calories: '#ff8243',
-  carbs: '#2dd4bf',
-  sugars: '#a78bfa',
-  protein: '#f59e0b',
-  fat: '#ec4899',
-};
-
-/**
- * Nutri-Score 기반 간소화 영양점수 계산 (0~100점)
- *
- * 기본 점수 70점에서 시작
- * - 부정적 요소 (초과 시 감점): 칼로리, 당류, 지방
- * - 긍정적 요소 (달성 시 가점): 단백질, 균형 섭취
- *
- * @param {Object} intake - intakeData 형태의 영양소 객체
- * @returns {number} 0~100 사이의 영양점수
- */
-const calculateNutritionScore = (intake) => {
-  let score = 70;
-
-  // === 부정적 점수 (초과 시 감점) ===
-
-  // 칼로리: 120% 초과 시 감점 (최대 -20점)
-  const calorieRatio = intake.calories.current / intake.calories.goal;
-  if (calorieRatio > 1.2) {
-    score -= Math.min((calorieRatio - 1.2) * 50, 20);
-  }
-
-  // 당류: 목표 초과 시 감점 (최대 -15점)
-  const sugarRatio = intake.sugars.current / intake.sugars.goal;
-  if (sugarRatio > 1) {
-    score -= Math.min((sugarRatio - 1) * 30, 15);
-  }
-
-  // 지방: 목표 초과 시 감점 (최대 -15점)
-  const fatRatio = intake.fat.current / intake.fat.goal;
-  if (fatRatio > 1) {
-    score -= Math.min((fatRatio - 1) * 30, 15);
-  }
-
-  // === 긍정적 점수 (달성 시 가점) ===
-
-  // 단백질: 달성률에 비례 (최대 +20점)
-  const proteinRatio = intake.protein.current / intake.protein.goal;
-  score += Math.min(proteinRatio * 20, 20);
-
-  // 칼로리 적정 섭취 보너스: 80~100% 시 +5점
-  if (calorieRatio >= 0.8 && calorieRatio <= 1.0) {
-    score += 5;
-  }
-
-  // 균형 보너스: 모든 영양소가 50% 이상 섭취 시 +5점
-  const allAbove50 = Object.values(intake).every(
-    (nutrient) => nutrient.current / nutrient.goal >= 0.5
-  );
-  if (allAbove50) {
-    score += 5;
-  }
-
-  return Math.round(Math.max(0, Math.min(100, score)));
+// 영양소별 색상
+const INTAKE_CONFIG = {
+  calories: { unit: 'kcal', color: '#ff8243' },
+  carbs: { unit: 'g', color: '#2dd4bf' },
+  sugars: { unit: 'g', color: '#a78bfa' },
+  protein: { unit: 'g', color: '#f59e0b' },
+  fat: { unit: 'g', color: '#ec4899' },
 };
 
 function HomePage() {
-  const { profile } = useProfile();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [nutritionScore, setNutritionScore] = useState(0);
+  const [intakeData, setIntakeData] = useState(null);
+  const [activityData, setActivityData] = useState(ACTIVITY_DATA_FALLBACK);
+  const [activitySummaries, setActivitySummaries] = useState([]);
+  const [activityGoals, setActivityGoals] = useState(null);
+  const [todayRecommend, setTodayRecommend] = useState(null);
 
-  // 프로필 기반 일일 권장섭취량 계산
-  const dailyTargets = useMemo(() => {
-    if (!profile?.height || !profile?.weight) {
-      return DEFAULT_TARGETS;
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchData() {
+      setLoading(true);
+      setError(null);
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const end = new Date(today);
+        const start = new Date(today);
+        start.setDate(start.getDate() - 6);
+        const startDate = start.toISOString().slice(0, 10);
+        const endDate = end.toISOString().slice(0, 10);
+
+        const [goalsRes, summaryRes, summariesRes, recommendRes] =
+          await Promise.all([
+            getNutritionGoals(today),
+            getDailySummary(today),
+            getDailySummaries(startDate, endDate),
+            getTodayRecommend(today).catch(() => null),
+          ]);
+        if (cancelled) return;
+
+        const goals = goalsRes?.data ?? {};
+        const summary = summaryRes?.data ?? {};
+
+        const targetCal = Number(goals.targetCalories) || 0;
+        const targetCarb = Number(goals.targetCarbohydrate) || 0;
+        const targetSugar = Number(goals.targetSugars) || 0;
+        const targetProtein = Number(goals.targetProtein) || 0;
+        const targetFat = Number(goals.targetFat) || 0;
+
+        setNutritionScore(Number(summary.score) || 0);
+        setIntakeData({
+          calories: {
+            current: Number(summary.calories) || 0,
+            goal: targetCal || 1,
+            ...INTAKE_CONFIG.calories,
+          },
+          carbs: {
+            current: Number(summary.carbohydrate) || 0,
+            goal: targetCarb || 1,
+            ...INTAKE_CONFIG.carbs,
+          },
+          sugars: {
+            current: Number(summary.sugars) || 0,
+            goal: targetSugar || 1,
+            ...INTAKE_CONFIG.sugars,
+          },
+          protein: {
+            current: Number(summary.protein) || 0,
+            goal: targetProtein || 1,
+            ...INTAKE_CONFIG.protein,
+          },
+          fat: {
+            current: Number(summary.fat) || 0,
+            goal: targetFat || 1,
+            ...INTAKE_CONFIG.fat,
+          },
+        });
+
+        const summaries = summariesRes?.data ?? [];
+        const scoreByDate = Object.fromEntries(
+          summaries.map((s) => [s.date, Number(s.score) || 0]),
+        );
+        const scores = [];
+        for (
+          let d = new Date(startDate);
+          d <= end;
+          d.setDate(d.getDate() + 1)
+        ) {
+          const key = d.toISOString().slice(0, 10);
+          scores.push(scoreByDate[key] ?? 0);
+        }
+        setActivityData(scores.length > 0 ? scores : ACTIVITY_DATA_FALLBACK);
+        setActivitySummaries(summaries);
+        setActivityGoals(goals);
+        setTodayRecommend(recommendRes?.data ?? null);
+      } catch (err) {
+        if (cancelled) return;
+        setError(
+          err?.response?.data?.message ??
+            err?.message ??
+            '데이터를 불러오는데 실패했습니다.',
+        );
+        setNutritionScore(0);
+        setIntakeData(null);
+        setActivityData(ACTIVITY_DATA_FALLBACK);
+        setActivitySummaries([]);
+        setActivityGoals(null);
+        setTodayRecommend(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
-    return calculateDailyTargets(profile);
-  }, [profile]);
 
-  // Mock 섭취 데이터 - 추후 API 연동 시 교체
-  const currentIntake = {
-    calories: 1450,
-    carbs: 180,
-    sugars: 45,
-    protein: 95,
-    fat: 33,
-  };
+    fetchData();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  // intakeData 구성 (프로필 기반 goal 적용)
-  const intakeData = useMemo(() => ({
-    calories: {
-      current: currentIntake.calories,
-      goal: dailyTargets.calories,
-      unit: 'kcal',
-      color: NUTRIENT_COLORS.calories,
-    },
-    carbs: {
-      current: currentIntake.carbs,
-      goal: dailyTargets.carbs,
-      unit: 'g',
-      color: NUTRIENT_COLORS.carbs,
-    },
-    sugars: {
-      current: currentIntake.sugars,
-      goal: dailyTargets.sugar,
-      unit: 'g',
-      color: NUTRIENT_COLORS.sugars,
-    },
-    protein: {
-      current: currentIntake.protein,
-      goal: dailyTargets.protein,
-      unit: 'g',
-      color: NUTRIENT_COLORS.protein,
-    },
-    fat: {
-      current: currentIntake.fat,
-      goal: dailyTargets.fat,
-      unit: 'g',
-      color: NUTRIENT_COLORS.fat,
-    },
-  }), [dailyTargets, currentIntake]);
+  const displayData =
+    intakeData ??
+    Object.fromEntries(
+      Object.entries(INTAKE_CONFIG).map(([k, v]) => [
+        k,
+        { current: 0, goal: 1, ...v },
+      ]),
+    );
 
-  // 영양점수 계산
-  const nutritionScore = useMemo(
-    () => calculateNutritionScore(intakeData),
-    [intakeData]
-  );
+  if (loading) {
+    return (
+      <div
+        className="flex items-center justify-center h-[calc(100vh-4rem)]"
+        style={{ color: 'var(--color-text-muted)' }}
+      >
+        <Loader2 className="w-12 h-12 animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div
+        className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] gap-4"
+        style={{ color: 'var(--color-text)' }}
+      >
+        <p className="text-lg">{error}</p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 rounded-lg text-white"
+          style={{ backgroundColor: 'var(--color-brand)' }}
+        >
+          다시 시도
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-4rem)] min-h-0 overflow-y-auto lg:overflow-hidden">
@@ -151,275 +191,391 @@ function HomePage() {
           Nutrition Score
         </h3>
         {/* 1번: Circle 영역 - 1/3 */}
-        <Box
-          sx={{
-            flex: 1,
-            minHeight: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderBottom: '1px solid #e8ecf0',
-            py: 2,
-          }}
-        >
-          <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-            {/* 배경 원 */}
-            <CircularProgress
-              variant="determinate"
-              value={100}
-              size={180}
-              thickness={4}
-              sx={{
-                color: '#f1f5f9',
-                position: 'absolute',
-              }}
-            />
-            {/* 점수 원 */}
-            <CircularProgress
-              variant="determinate"
-              value={nutritionScore}
-              size={180}
-              thickness={4}
-              sx={{
-                color: '#FF8243',
-                '& .MuiCircularProgress-circle': {
-                  strokeLinecap: 'round',
-                },
-              }}
-            />
-            {/* 중앙 텍스트 */}
-            <Box
-              sx={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                bottom: 0,
-                right: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Typography
-                variant="h2"
-                component="span"
-                fontWeight={600}
-                sx={{ color: 'text.primary', lineHeight: 1 }}
+        <div className="flex-1 min-h-0 flex flex-col items-center justify-center border-b border-[var(--color-border)] py-2">
+          <div className="relative w-60 h-60 flex items-center justify-center">
+            <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+              <circle
+                cx="50"
+                cy="50"
+                r="42"
+                fill="none"
+                stroke="var(--color-border)"
+                strokeWidth="8"
+              />
+              <circle
+                cx="50"
+                cy="50"
+                r="42"
+                fill="none"
+                stroke="var(--color-brand)"
+                strokeWidth="8"
+                strokeLinecap="round"
+                strokeDasharray={`${(nutritionScore / 100) * 264} 264`}
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span
+                className="font-bold text-4xl"
+                style={{ color: 'var(--color-text)' }}
               >
                 {nutritionScore}
-              </Typography>
-              <Typography
-                variant="body1"
-                sx={{ color: 'text.secondary', mt: 0.5 }}
+              </span>
+              <span
+                className="text-xl"
+                style={{ color: 'var(--color-text-muted)' }}
               >
                 / 100점
-              </Typography>
-            </Box>
-          </Box>
-          {/* 점수 등급 표시 */}
-          <Box
-            sx={{
-              mt: 2,
-              px: 2,
-              py: 0.5,
-              borderRadius: 2,
-              bgcolor: nutritionScore >= 80 ? '#e8f5e9' : nutritionScore >= 50 ? '#fff3ed' : '#ffebee',
-            }}
-          >
-            <Typography
-              variant="body2"
-              fontWeight={700}
-              sx={{
-                color: nutritionScore >= 80 ? '#2e7d32' : nutritionScore >= 50 ? '#E05A1F' : '#c62828',
-              }}
-            >
-              {nutritionScore >= 80 ? '아주 좋아요!' : nutritionScore >= 50 ? '좋아요' : '노력이 필요해요'}
-            </Typography>
-          </Box>
-        </Box>
+              </span>
+            </div>
+          </div>
+        </div>
         {/* 2번: Today's Intake 영역 - 1/3 */}
-        <Box
-          sx={{
-            flex: 1,
-            minHeight: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            py: 2,
-            borderBottom: '1px solid #e8ecf0',
-            overflow: 'hidden',
-          }}
-        >
-          <Typography
-            variant="body1"
-            color="text.secondary"
-            fontWeight={600}
-            sx={{ mb: 1.5, flexShrink: 0 }}
+        <div className="flex-1 min-h-0 flex flex-col py-2 border-b border-[var(--color-border)] overflow-hidden">
+          <p
+            className="text-lg mb-1 w-full shrink-0"
+            style={{ color: 'var(--color-text-muted)' }}
           >
-            Today's Intake
-          </Typography>
-          <Stack spacing={1.5} sx={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-            {Object.entries(intakeData).map(
+            Today&apos;s Intake
+          </p>
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5">
+            {Object.entries(displayData).map(
               ([key, { current, goal, unit, color }]) => (
-                <Box key={key}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                    <Typography variant="body2" fontWeight={500} color="text.primary">
+                <div key={key} className="shrink-0">
+                  <div className="flex justify-between text-lg mb-0.5">
+                    <span style={{ color: 'var(--color-text)' }}>
                       {key === 'calories'
                         ? 'Calories'
                         : key === 'sugars'
                           ? 'Sugars'
                           : key.charAt(0).toUpperCase() + key.slice(1)}
-                    </Typography>
-                    <Typography variant="body2" fontWeight={600} sx={{ color }}>
-                      {current.toLocaleString?.() ?? current}
-                      <Typography component="span" variant="body2" color="text.disabled">
-                        {' '}/ {goal.toLocaleString?.() ?? goal} {unit}
-                      </Typography>
-                    </Typography>
-                  </Box>
-                  <LinearProgress
-                    variant="determinate"
-                    value={Math.min((current / goal) * 100, 100)}
-                    sx={{
-                      height: 6,
-                      borderRadius: 3,
-                      bgcolor: '#f1f5f9',
-                      '& .MuiLinearProgress-bar': {
-                        bgcolor: color,
-                        borderRadius: 3,
-                      },
-                    }}
-                  />
-                </Box>
+                    </span>
+                    <span
+                      className="font-medium"
+                      style={{ color: 'var(--color-text-muted)' }}
+                    >
+                      {current.toLocaleString?.() ?? current} /{' '}
+                      {goal.toLocaleString?.() ?? goal} {unit}
+                    </span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-[var(--color-border)] overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{
+                        width: `${Math.min((current / goal) * 100, 100)}%`,
+                        backgroundColor: color,
+                      }}
+                    />
+                  </div>
+                </div>
               ),
             )}
-          </Stack>
-        </Box>
-        {/* 3번: 격려 문구 영역 - 1/3 */}
-        <Box
-          sx={{
-            flex: 1,
-            minHeight: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            textAlign: 'center',
-            p: 2,
-            mt: 2,
-            bgcolor: '#fff3ed',
-            border: '1px solid #ffe0cc',
-            borderRadius: 3,
+          </div>
+        </div>
+        {/* 3번: 오늘의 추천 한 줄 문구 영역 - 1/3 */}
+        <div
+          className="flex-1 min-h-0 flex flex-col items-center justify-center text-center p-2 mt-4"
+          style={{
+            backgroundColor: 'rgba(255, 130, 67, 0.08)',
+            border: '1px solid rgba(255, 130, 67, 0.2)',
+            borderRadius: '0.75rem',
           }}
         >
-          <Typography
-            variant="h4"
-            component="span"
-            sx={{ mb: 1 }}
-          >
-            {nutritionScore >= 80 ? '🌟' : nutritionScore >= 50 ? '✨' : '💪'}
-          </Typography>
-          <Typography
-            variant="body1"
-            fontWeight={600}
-            color="text.primary"
-            sx={{ lineHeight: 1.6 }}
-          >
-            오늘의 nutrition score는{' '}
-            <Typography
-              component="span"
-              fontWeight={700}
-              sx={{ color: '#FF8243' }}
-            >
-              {nutritionScore}점
-            </Typography>
-            입니다.
-          </Typography>
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{ mt: 0.5 }}
-          >
-            {nutritionScore >= 80
-              ? '아주 높은 점수예요! 내일도 이런 기록을 유지해보자!'
-              : nutritionScore >= 50
-                ? '잘했어요!'
-                : '좀 더 올려보자!'}
-          </Typography>
-        </Box>
-      </div>
-
-      {/* Right Top: AI Recommended Meal */}
-      <div className="lg:col-span-2 bg-white rounded-2xl p-4 shadow-sm border border-[var(--color-border)] flex flex-col min-h-0 overflow-hidden">
-        <div className="flex items-center justify-between mb-2 shrink-0">
-          <h3
-            className="text-base font-semibold"
+          <p
+            className="text-lg font-semibold leading-relaxed"
             style={{ color: 'var(--color-text)' }}
           >
-            AI Recommended Meal
-          </h3>
-          <ChevronRight size={18} style={{ color: 'var(--color-brand)' }} />
-        </div>
-        <div className="flex-1 min-h-0 rounded-xl overflow-hidden mb-2 bg-[var(--color-background)]">
-          <img
-            src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&h=400&fit=crop"
-            alt="Salmon salad"
-            className="w-full h-full object-cover"
-          />
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span
-            className="inline-block px-2 py-0.5 rounded-lg text-xs font-medium"
-            style={{
-              backgroundColor: 'rgba(255, 130, 67, 0.15)',
-              color: 'var(--color-brand)',
-            }}
-          >
-            Salad meal
-          </span>
+            {todayRecommend?.message ?? (
+              <>
+                <span className="text-2xl block mb-0.5">✨</span>
+                오늘도 건강한 하루 되세요!
+              </>
+            )}
+          </p>
         </div>
       </div>
 
-      {/* Right Bottom: Activity Summary - Line Graph */}
+      {/* Right Top: AI Recommended Meal 미리보기 */}
       <div className="lg:col-span-2 bg-white rounded-2xl p-4 shadow-sm border border-[var(--color-border)] flex flex-col min-h-0 overflow-hidden">
         <h3
-          className="text-base font-semibold mb-2 shrink-0"
+          className="text-base font-semibold mb-3 shrink-0"
           style={{ color: 'var(--color-text)' }}
         >
-          Activity Summary
+          AI Recommended Meal
         </h3>
-        <div className="flex-1 min-h-0 w-full flex flex-col">
-          <svg
-            viewBox="0 0 340 100"
-            className="w-full flex-1 min-h-0"
-            preserveAspectRatio="xMidYMid meet"
+
+        {/* 태그 필터 미리보기 */}
+        <div className="flex flex-wrap gap-2 mb-4 shrink-0">
+          {['고단백', '다이어트', '채소', '저탄수', '저당', '과일'].map(
+            (tag) => (
+              <Link
+                key={tag}
+                to={{
+                  pathname: '/home/recommendation',
+                  state: { selectedTag: tag },
+                }}
+                className="px-3 py-1.5 rounded-full text-xs font-medium bg-gray-50 hover:bg-[#FF8243] hover:text-white transition-colors"
+                style={{ color: '#64748b' }}
+              >
+                #{tag}
+              </Link>
+            ),
+          )}
+        </div>
+
+        {/* 추천 식품 3개 미리보기 */}
+        {todayRecommend?.foods?.length > 0 ? (
+          <div className="flex-1 min-h-0 grid grid-cols-3 gap-4 pb-2">
+            {(todayRecommend.foods || []).slice(0, 3).map((food) => (
+              <RecommendPreviewCard key={food.id} food={food} />
+            ))}
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-sm py-8 text-gray-400">
+            추천을 불러오는 중...
+          </div>
+        )}
+
+        {/* Recommend 페이지 이동 버튼 */}
+        <Link
+          to="/home/recommendation"
+          className="mt-4 shrink-0 flex items-center justify-center gap-2 py-3 px-5 rounded-xl text-sm font-semibold text-white shadow-sm hover:shadow-md transition-all"
+          style={{ backgroundColor: '#FF8243' }}
+        >
+          식단 추천 페이지로 이동
+          <ChevronRight size={18} strokeWidth={2.5} />
+        </Link>
+      </div>
+
+      {/* Right Middle: 최근 7일 영양 점수 추이 */}
+      <ActivityScoreChart
+        data={activityData.length ? activityData : ACTIVITY_DATA_FALLBACK}
+        summaries={activitySummaries}
+        goals={activityGoals}
+      />
+    </div>
+  );
+}
+
+// ─── 추천 식품 미리보기 카드 (홈 전용, 가독성 개선) ─────────────────────────────────
+function RecommendPreviewCard({ food }) {
+  const items = [
+    { label: '칼로리', val: food.kcal, unit: 'kcal', color: '#FF8243' },
+    { label: '탄수화물', val: food.carbs, unit: 'g', color: '#6b7280' },
+    { label: '단백질', val: food.protein, unit: 'g', color: '#059669' },
+    { label: '지방', val: food.fat, unit: 'g', color: '#dc2626' },
+    { label: '당', val: food.sugar, unit: 'g', color: '#7c3aed' },
+  ];
+  const format = (v, u) =>
+    v != null && v !== ''
+      ? `${Number(v).toFixed(u === 'kcal' ? 0 : 1)}${u}`
+      : '-';
+
+  return (
+    <Link
+      to="/home/recommendation"
+      className="min-w-0 p-4 rounded-xl bg-gray-50/80 hover:bg-orange-50/80 border border-gray-100 hover:border-[#FF8243]/30 transition-all group flex flex-col"
+    >
+      <p
+        className="font-semibold text-gray-800 truncate mb-3 group-hover:text-[#FF8243] transition-colors"
+        title={food.name}
+      >
+        {food.name}
+      </p>
+      <div className="space-y-1.5 text-xs">
+        {items.map(({ label, val, unit, color }) => (
+          <div
+            key={label}
+            className="flex justify-between items-baseline gap-2"
           >
-            <polyline
-              fill="none"
-              stroke="var(--color-brand)"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              points={ACTIVITY_DATA.map((val, i) => {
-                const x = (i / (ACTIVITY_DATA.length - 1)) * 320 + 10;
-                const y = 85 - (val / 100) * 70;
-                return `${x},${y}`;
-              }).join(' ')}
-            />
-          </svg>
-        </div>
-        <div className="flex justify-between mt-1 px-1 shrink-0">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-            <span
-              key={day}
-              className="text-xs"
-              style={{ color: 'var(--color-text-muted)' }}
-            >
-              {day}
+            <span className="text-gray-500 shrink-0">{label}</span>
+            <span className="font-semibold tabular-nums" style={{ color }}>
+              {format(val, unit)}
             </span>
-          ))}
+          </div>
+        ))}
+      </div>
+    </Link>
+  );
+}
+
+// 일일식사기록 영양 목표와 동일한 항목 (칼로리, 탄수화물, 단백질, 지방, 당류)
+const NUTRIENT_ITEMS = [
+  {
+    key: 'calories',
+    label: '칼로리',
+    apiKey: 'calories',
+    unit: 'kcal',
+    color: '#FF8243',
+  },
+  {
+    key: 'carbs',
+    label: '탄수화물',
+    apiKey: 'carbohydrate',
+    unit: 'g',
+    color: '#FFA726',
+  },
+  {
+    key: 'protein',
+    label: '단백질',
+    apiKey: 'protein',
+    unit: 'g',
+    color: '#66BB6A',
+  },
+  { key: 'fat', label: '지방', apiKey: 'fat', unit: 'g', color: '#EF5350' },
+  {
+    key: 'sugars',
+    label: '당류',
+    apiKey: 'sugars',
+    unit: 'g',
+    color: '#AB47BC',
+  },
+];
+const GOAL_KEYS = {
+  calories: 'targetCalories',
+  carbs: 'targetCarbohydrate',
+  protein: 'targetProtein',
+  fat: 'targetFat',
+  sugars: 'targetSugars',
+};
+
+function ActivityScoreChart({ data: scores, summaries, goals }) {
+  const chartData = useMemo(() => {
+    const today = new Date();
+    const summaryByDate = Object.fromEntries(
+      (summaries || []).map((s) => [s.date, s]),
+    );
+    return scores.map((val, i) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() - (scores.length - 1 - i));
+      const dateStr = d.toISOString().slice(0, 10);
+      const summary = summaryByDate[dateStr] || {};
+      return {
+        day: `${d.getMonth() + 1}/${d.getDate()}`,
+        dateStr,
+        score: Math.min(val, 100),
+        calories: Number(summary.calories) || 0,
+        carbohydrate: Number(summary.carbohydrate) || 0,
+        protein: Number(summary.protein) || 0,
+        fat: Number(summary.fat) || 0,
+        sugars: Number(summary.sugars) || 0,
+      };
+    });
+  }, [scores, summaries]);
+
+  const CustomTooltip = ({ active, payload }) => {
+    if (!active || !payload?.[0]) return null;
+    const row = payload[0].payload;
+    const hasGoals =
+      goals &&
+      (goals.targetCalories != null || goals.targetCarbohydrate != null);
+    return (
+      <div
+        className="px-2.5 py-2 rounded-lg shadow-lg text-xs"
+        style={{
+          backgroundColor: '#fff',
+          border: '1px solid #e5e7eb',
+          minWidth: 140,
+        }}
+      >
+        <div className="flex justify-between items-baseline mb-1.5">
+          <span style={{ color: '#6b7280' }}>{row.day}</span>
+          <span className="font-semibold ml-2" style={{ color: '#FF8243' }}>
+            {row.score}점
+          </span>
         </div>
+        {hasGoals && (
+          <div className="space-y-1">
+            {NUTRIENT_ITEMS.map(({ key, label, apiKey, unit, color }) => {
+              const current = row[apiKey] ?? 0;
+              const goal = Number(goals[GOAL_KEYS[key]]) || 1;
+              const pct = Math.min((current / goal) * 100, 100);
+              const text =
+                unit === 'kcal'
+                  ? `${Math.round(current)} / ${Math.round(goal)}`
+                  : `${Number(current).toFixed(1)} / ${Number(goal).toFixed(1)}`;
+              return (
+                <div key={key} className="flex items-center gap-1.5">
+                  <span className="text-gray-500 w-12 shrink-0">{label}</span>
+                  <div className="flex-1 h-1 rounded-full bg-gray-100 overflow-hidden min-w-[40px]">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${pct}%`, backgroundColor: color }}
+                    />
+                  </div>
+                  <span
+                    className="text-gray-700 font-medium shrink-0"
+                    style={{ fontSize: 10 }}
+                  >
+                    {text} {unit}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {!hasGoals && <span className="text-gray-500">목표 데이터 없음</span>}
+      </div>
+    );
+  };
+
+  return (
+    <div
+      className="lg:col-span-2 bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col min-h-0 overflow-hidden"
+      style={{ minHeight: 220 }}
+    >
+      <div className="mb-3 shrink-0">
+        <h3 className="text-base font-semibold text-gray-800">
+          최근 7일 영양 점수
+        </h3>
+        <p className="text-xs mt-0.5 text-gray-500">
+          일별 영양 균형 점수 (0~100점, 높을수록 균형이 좋음)
+        </p>
+      </div>
+      <div
+        className="flex-1 min-h-0 w-full"
+        style={{ minHeight: 160 }}
+      >
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart
+            data={chartData}
+            margin={{ top: 8, right: 16, left: 0, bottom: 4 }}
+          >
+            <CartesianGrid
+              strokeDasharray="3 3"
+              vertical={false}
+              stroke="#f0f0f0"
+            />
+            <XAxis
+              dataKey="day"
+              tick={{ fill: '#6b7280', fontSize: 12 }}
+              axisLine={{ stroke: '#e5e7eb' }}
+              tickLine={false}
+            />
+            <YAxis
+              domain={[0, 100]}
+              tick={{ fill: '#6b7280', fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <Tooltip
+              content={<CustomTooltip />}
+              cursor={{ stroke: '#e5e7eb', strokeDasharray: '4 2' }}
+            />
+            <Line
+              type="monotone"
+              dataKey="score"
+              stroke="#FF8243"
+              strokeWidth={2}
+              dot={{ r: 4, fill: '#FF8243', stroke: '#fff', strokeWidth: 2 }}
+              activeDot={{
+                r: 5,
+                fill: '#FF8243',
+                stroke: '#fff',
+                strokeWidth: 2,
+              }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );

@@ -195,7 +195,17 @@ export default function Alert() {
         code: json.code,
         message: json.message ?? `요청 실패 (${res.status})`,
       };
-    return json.data ?? json ?? [];
+    const list = json.data ?? json ?? [];
+    // 동일 내용·시각의 중복 알림 제거 (type, title, message, createdAt 기준)
+    const seen = new Set();
+    return Array.isArray(list)
+      ? list.filter((n) => {
+          const key = `${n.type}|${n.title}|${n.message}|${n.createdAt ?? ''}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+      : [];
   };
 
   const fetchNotifications = useCallback(

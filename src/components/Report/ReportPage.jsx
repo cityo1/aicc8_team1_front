@@ -7,6 +7,8 @@ import { PiChefHat } from 'react-icons/pi';
 import FoodCardRecommend from '../Recommend/FoodCardRecommend';
 import ReportCards from './ReportCards';
 import { useProfile } from '../../contexts/ProfileContext';
+import { checkDeficiency } from '../../api/nutrition';
+import { Loader2, Stethoscope } from 'lucide-react';
 import {
   calculateNutritionScore,
   buildUserForScore,
@@ -279,42 +281,42 @@ const ReportPage = () => {
             </div>
           </div>
 
-          {/* AI 리뷰 사이드바 */}
-          <div className="col-span-1 bg-white p-8 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-            <h3 className="font-bold text-xl mb-6 flex items-center text-gray-800">
-              <span className="mr-2">
-                <PiChefHat size={25} color="#FF8243" />
-              </span>{' '}
-              AI 영양사 리뷰
-            </h3>
-            <div className="flex-1 space-y-6 text-gray-700 leading-relaxed">
-              <div className="relative">
-                <div className="bg-white p-6 rounded-2xl border-2 border-[#FF8243] relative shadow-sm">
-                  <p className="font-medium text-[#1E2923]">
+          {/* AI 리뷰 사이드바 + 영양 결핍 체크 */}
+          <div className="col-span-1 flex flex-col gap-5">
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+              <h3 className="font-bold text-lg mb-4 flex items-center text-gray-800">
+                <span className="mr-2">
+                  <PiChefHat size={22} color="#FF8243" />
+                </span>
+                AI 영양사 리뷰
+              </h3>
+              <div className="space-y-4 text-gray-700 leading-relaxed">
+                <div className="bg-white p-4 rounded-xl border-2 border-[#FF8243] shadow-sm">
+                  <p className="font-medium text-sm text-[#1E2923]">
                     "단백질 섭취가 매우 우수합니다. 다만 비타민 부족이 관찰되니
                     과일 섭취를 늘려보세요."
                   </p>
                 </div>
-              </div>
-              <div className="space-y-4">
-                <h4 className="font-bold text-[#FF8243]">개선 포인트</h4>
-                <ul className="list-disc ml-5 space-y-2 text-sm text-gray-600">
-                  <li>정제 탄수화물(흰 쌀밥) 대신 잡곡밥 선택</li>
-                  <li>하루 물 2L 섭취 루틴 유지하기</li>
-                  <li>취침 3시간 전 금식 실천</li>
-                </ul>
-              </div>
-              <div className="pt-6 border-t border-gray-100">
-                <h4 className="font-bold text-[#FF8243] mb-4">
-                  추천 식단 구성
-                </h4>
-                <div className="flex flex-col gap-5">
-                  {foodList.map((item) => (
-                    <FoodCardRecommend key={item.id} food={item} />
-                  ))}
+                <div className="space-y-2">
+                  <h4 className="font-bold text-sm text-[#FF8243]">개선 포인트</h4>
+                  <ul className="list-disc ml-4 space-y-1 text-xs text-gray-600">
+                    <li>정제 탄수화물(흰 쌀밥) 대신 잡곡밥 선택</li>
+                    <li>하루 물 2L 섭취 루틴 유지하기</li>
+                    <li>취침 3시간 전 금식 실천</li>
+                  </ul>
+                </div>
+                <div className="pt-4 border-t border-gray-100">
+                  <h4 className="font-bold text-sm text-[#FF8243] mb-3">추천 식단 구성</h4>
+                  <div className="flex flex-col gap-3">
+                    {foodList.map((item) => (
+                      <FoodCardRecommend key={item.id} food={item} />
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
+
+            <DeficiencyCheckCard userId={profile?.id} />
           </div>
         </div>
       </div>
@@ -331,5 +333,103 @@ const ReportPage = () => {
     </div>
   );
 };
+
+// ─── 영양 결핍 체크 카드 ────────────────────────────────────────────────────
+function DeficiencyCheckCard({ userId }) {
+  const [dateStr, setDateStr] = useState(() =>
+    new Date().toISOString().slice(0, 10)
+  );
+  const [checking, setChecking] = useState(false);
+  const [result, setResult] = useState(null);
+  const [checkError, setCheckError] = useState(null);
+
+  const handleCheck = async () => {
+    if (!userId) {
+      setCheckError('로그인이 필요합니다.');
+      return;
+    }
+    setChecking(true);
+    setCheckError(null);
+    setResult(null);
+    try {
+      const res = await checkDeficiency(dateStr, userId);
+      setResult(res?.data ?? null);
+    } catch (err) {
+      setCheckError(
+        err?.response?.data?.message ??
+          err?.message ??
+          '결핍 체크에 실패했습니다.'
+      );
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  return (
+    <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+      <h3 className="font-bold text-lg mb-4 flex items-center text-gray-800">
+        <span className="mr-2">
+          <Stethoscope size={20} color="#FF8243" />
+        </span>
+        영양 결핍 체크
+      </h3>
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <input
+          type="date"
+          value={dateStr}
+          onChange={(e) => setDateStr(e.target.value)}
+          className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-800"
+        />
+        <button
+          type="button"
+          onClick={handleCheck}
+          disabled={checking || !userId}
+          className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-white text-sm font-medium disabled:opacity-50 bg-[#FF8243] hover:bg-[#e57339]"
+        >
+          {checking ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Stethoscope size={16} />
+          )}
+          {checking ? '검사 중...' : '결핍 체크'}
+        </button>
+      </div>
+      {checkError && (
+        <p className="text-sm text-red-500 mb-2">{checkError}</p>
+      )}
+      {result && (
+        <div className="space-y-2">
+          {result.alerts?.length ? (
+            <ul className="space-y-1.5">
+              {result.alerts.map((a, i) => (
+                <li
+                  key={i}
+                  className="text-sm px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-gray-800"
+                >
+                  <span className="font-semibold">
+                    {a.type === 'CALORIES'
+                      ? '칼로리'
+                      : a.type === 'CARBOHYDRATE'
+                        ? '탄수화물'
+                        : a.type === 'PROTEIN'
+                          ? '단백질'
+                          : a.type === 'FAT'
+                            ? '지방'
+                            : a.type}
+                  </span>
+                  : 목표 {a.target} 중 {a.current} 섭취 (부족)
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-gray-600">
+              선택한 날짜에 영양 결핍이 없습니다.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default ReportPage;
