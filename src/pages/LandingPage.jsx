@@ -58,7 +58,7 @@ export default function LandingPage() {
           {[
             { icon: Camera, label: 'AI 식단분석' },
             { icon: Utensils, label: '일일식사기록' },
-            { icon: BarChart3, label: '주간/월간리포트' },
+            { icon: BarChart3, label: '주간리포트' },
             { icon: Sparkles, label: '영양점수 추적' },
           ].map(({ icon: Icon, label }) => (
             <div
