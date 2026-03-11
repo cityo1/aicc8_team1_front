@@ -109,7 +109,6 @@ export const WeeklyLineChart = ({ data }) => {
         dataKey={dataKey}
         stroke={color}
         strokeWidth={isMain ? 2 : 2}
-        // 비활성화 시 차트에서 선과 점을 완전히 숨김
         strokeOpacity={isActive ? 1 : 0}
         dot={isActive ? { r: 3, fill: color } : false}
         activeDot={isActive ? { r: 3 } : false}
@@ -132,7 +131,7 @@ export const WeeklyLineChart = ({ data }) => {
           onClick={handleLegendClick}
           formatter={renderCustomLegendText}
           iconType="circle"
-          iconSize={12}
+          iconSize={11}
           payload={seriesOrder.map((item) => ({
             dataKey: item.dataKey,
             value: item.label,

@@ -159,10 +159,10 @@ const FoodCardRecommend = ({
         })}
       </div>
 
-      <div className="h-[1px] bg-gray-100 mb-3" />
+      <div className="h-[1px] bg-white mb-1" />
 
       {/* 태그 영역 */}
-      <div className="flex flex-wrap gap-1.5 mb-3 min-h-[26px]">
+      <div className="flex flex-wrap gap-1.5 mb-2 min-h-[26px]">
         {isLoading ? (
           // 스켈레톤
           <>
@@ -182,7 +182,7 @@ const FoodCardRecommend = ({
         )}
       </div>
 
-      <div className="h-[1px] bg-gray-100 mb-3" />
+      <div className="h-[1px] bg-white mb-3" />
 
       {/* 하단: 삭제 및 선택 버튼 */}
       <div className="flex justify-between items-center">

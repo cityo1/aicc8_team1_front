@@ -26,17 +26,24 @@ const ReportPage = () => {
 
       const API_BASE_URL = 'http://localhost:8000';
       const userId = profile.id;
+
+      // 7일 전 날짜 계산 (startDate)
       const today = new Date();
-      const dateStr = today.toISOString().split('T')[0];
+      const lastWeek = new Date(today);
+      lastWeek.setDate(today.getDate() - 6);
+      const startDate = lastWeek.toISOString().split('T')[0];
 
       try {
+        // 명세서에 따른 API 경로 및 쿼리 파라미터 변경
         const response = await fetch(
-          `${API_BASE_URL}/api/diary/daily?userId=${userId}&date=${dateStr}`,
+          `${API_BASE_URL}/api/report/weeklydata?userId=${userId}&startDate=${startDate}`,
         );
         if (response.ok) {
           const result = await response.json();
-          // result가 배열이면 그대로 사용, 단일 객체면 배열로 감쌈
-          setDailyData(Array.isArray(result) ? result : [result]);
+          // 명세서 상 Response 구조: { success: true, data: { days: [...] } }
+          if (result.success && result.data.days) {
+            setDailyData(result.data.days);
+          }
         }
       } catch (error) {
         console.error('Data fetch error:', error);
@@ -46,14 +53,14 @@ const ReportPage = () => {
     fetchDiaryData();
   }, [profile]);
 
-  // 오늘 먹은 데이터 추출
+  // 오늘 먹은 데이터 추출 (배열의 마지막 요소)
   const todayMeal = useMemo(() => {
     if (dailyData.length === 0)
       return { calories: 0, carbs: 0, protein: 0, fat: 0, sugar: 0 };
 
     const latest = dailyData[dailyData.length - 1];
     return {
-      calories: latest.calories || 0,
+      calories: latest.kcal || 0, // kcal 필드명 대응
       carbs: latest.carbohydrate || 0,
       protein: latest.protein || 0,
       fat: latest.fat || 0,
@@ -137,11 +144,11 @@ const ReportPage = () => {
 
   // 7일간 변화 추이 데이터 바인딩
   const lineData = useMemo(() => {
-    // API 데이터가 있으면 해당 데이터를 사용, 없으면 빈 7일 생성
+    // API 데이터(dailyData)가 있으면 해당 데이터를 사용
     if (dailyData.length > 0) {
-      return dailyData.slice(-7).map((item) => ({
+      return dailyData.map((item) => ({
         day: item.date ? item.date.slice(5, 10).replace('-', '/') : '??',
-        kcal: item.calories || 0,
+        kcal: item.kcal || 0,
         carbohydrate: item.carbohydrate || 0,
         protein: item.protein || 0,
         fat: item.fat || 0,
@@ -229,15 +236,17 @@ const ReportPage = () => {
                     }`}
                   >
                     {reportResult.diffLastWeek > 0 ? (
-                      <FaPlus size={15} className="mt-1" />
+                      <FaPlus size={13} className="mt-0.5" />
                     ) : reportResult.diffLastWeek < 0 ? (
-                      <FaMinus size={15} className="mt-1" />
+                      <FaMinus size={13} className="mt-0.5" />
                     ) : (
-                      <FaPlusMinus size={15} className="mt-1" />
+                      <FaPlusMinus size={13} className="mt-0.5" />
                     )}
                     {Math.abs(reportResult.diffLastWeek)}
                   </div>
-                  <span className="text-gray-500 text-[19px] -ml-1">점</span>
+                  <span className="text-gray-500 text-[15px] mt-0.5 -ml-1">
+                    점
+                  </span>
                 </div>
               </div>
             </div>
