@@ -3,6 +3,22 @@ import { useAuth } from './AuthContext';
 import { authApi } from '../api/auth';
 
 const PROFILE_IMAGE_KEY = 'profileImage';
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
+
+/**
+ * 프로필 이미지 경로를 전체 URL로 변환
+ * @param {string|null} imagePath - 이미지 경로 (상대 경로 또는 전체 URL)
+ * @returns {string|null} 전체 URL 또는 null
+ */
+function getFullImageUrl(imagePath) {
+  if (!imagePath) return null;
+  // 이미 전체 URL이거나 base64인 경우 그대로 반환
+  if (imagePath.startsWith('http') || imagePath.startsWith('data:')) {
+    return imagePath;
+  }
+  // 상대 경로인 경우 API_BASE_URL 추가
+  return `${API_BASE_URL}${imagePath}`;
+}
 
 const defaultProfile = {
   nickname: '',
@@ -42,7 +58,7 @@ export function ProfileProvider({ children }) {
       dietary: Array.isArray(user.dietaryRestrictions)
         ? user.dietaryRestrictions
         : (Array.isArray(user.dietary) ? user.dietary : []),
-      profileImage: user.profileImage || savedImage || null,
+      profileImage: getFullImageUrl(user.profileImage) || savedImage || null,
     };
 
     setProfileState(profileFromUser);
@@ -67,7 +83,7 @@ export function ProfileProvider({ children }) {
         dietary: Array.isArray(userData.dietaryRestrictions)
           ? userData.dietaryRestrictions
           : (Array.isArray(userData.dietary) ? userData.dietary : []),
-        profileImage: userData.profileImage || savedImage || null,
+        profileImage: getFullImageUrl(userData.profileImage) || savedImage || null,
       };
       setProfileState(fetched);
 
@@ -85,12 +101,13 @@ export function ProfileProvider({ children }) {
 
   // 프로필 이미지 업데이트 (localStorage에도 저장)
   const setProfileImage = useCallback((imageData) => {
-    if (imageData) {
-      localStorage.setItem(PROFILE_IMAGE_KEY, imageData);
+    const fullUrl = getFullImageUrl(imageData);
+    if (fullUrl) {
+      localStorage.setItem(PROFILE_IMAGE_KEY, fullUrl);
     } else {
       localStorage.removeItem(PROFILE_IMAGE_KEY);
     }
-    setProfileState((prev) => ({ ...prev, profileImage: imageData }));
+    setProfileState((prev) => ({ ...prev, profileImage: fullUrl }));
   }, []);
 
   // 프로필 로컬 상태 업데이트

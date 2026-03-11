@@ -387,31 +387,68 @@ export default function Setting() {
     setError('');
   };
 
-  // 프로필 이미지 선택 핸들러
-  const handleImageSelect = (e) => {
+  const [imageUploading, setImageUploading] = useState(false);
+
+  // 프로필 이미지 선택 및 서버 업로드 핸들러
+  const handleImageSelect = async (e) => {
     const file = e.target.files?.[0];
-    if (file) {
-      // 파일 크기 체크 (2MB 제한)
-      if (file.size > 2 * 1024 * 1024) {
-        setError('이미지 크기는 2MB 이하여야 합니다.');
-        return;
+    if (!file) return;
+
+    // 파일 크기 체크 (2MB 제한)
+    if (file.size > 2 * 1024 * 1024) {
+      setError('이미지 크기는 2MB 이하여야 합니다.');
+      return;
+    }
+
+    // 파일 형식 체크
+    if (!file.type.startsWith('image/')) {
+      setError('이미지 파일만 업로드 가능합니다.');
+      return;
+    }
+
+    setImageUploading(true);
+    setError('');
+    setInfoMessage('');
+
+    try {
+      // 서버에 이미지 업로드
+      const response = await authApi.uploadProfileImage(file);
+      const imageUrl = response.profileImage || response.data?.profileImage;
+
+      if (imageUrl) {
+        // Context 업데이트 (서버 URL 저장)
+        setProfileImage(imageUrl);
+        setInfoMessage('프로필 사진이 업로드되었습니다.');
       }
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setProfileImage(event.target.result);
-        setInfoMessage('프로필 사진이 변경되었습니다.');
-      };
-      reader.readAsDataURL(file);
+    } catch (err) {
+      setError(err.message || '프로필 사진 업로드에 실패했습니다.');
+    } finally {
+      setImageUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
   // 프로필 이미지 삭제 핸들러
-  const handleImageRemove = () => {
-    setProfileImage(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+  const handleImageRemove = async () => {
+    setImageUploading(true);
+    setError('');
+    setInfoMessage('');
+
+    try {
+      // 서버에서 이미지 삭제
+      await authApi.deleteProfileImage();
+      setProfileImage(null);
+      setInfoMessage('프로필 사진이 삭제되었습니다.');
+    } catch (err) {
+      setError(err.message || '프로필 사진 삭제에 실패했습니다.');
+    } finally {
+      setImageUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
-    setInfoMessage('프로필 사진이 삭제되었습니다.');
   };
 
   const handleSaveProfile = async () => {
@@ -506,18 +543,40 @@ export default function Setting() {
                   bgcolor: '#ff8243',
                   fontSize: '2rem',
                   fontWeight: 700,
-                  cursor: 'pointer',
+                  cursor: imageUploading ? 'wait' : 'pointer',
                   border: '3px solid #fff',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                  opacity: imageUploading ? 0.6 : 1,
                 }}
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => !imageUploading && fileInputRef.current?.click()}
               >
                 {!profile.profileImage &&
                   (form.nickname || '사용자').charAt(0).toUpperCase()}
               </Avatar>
+              {imageUploading && (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    bgcolor: 'rgba(255,255,255,0.7)',
+                    borderRadius: '50%',
+                  }}
+                >
+                  <Typography variant="caption" color="text.secondary">
+                    업로드 중...
+                  </Typography>
+                </Box>
+              )}
               <IconButton
                 size="small"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => !imageUploading && fileInputRef.current?.click()}
+                disabled={imageUploading}
                 sx={{
                   position: 'absolute',
                   bottom: -4,
@@ -527,6 +586,7 @@ export default function Setting() {
                   width: 28,
                   height: 28,
                   '&:hover': { bgcolor: '#e05a1f' },
+                  '&.Mui-disabled': { bgcolor: '#ccc', color: '#fff' },
                   boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
                 }}
               >
@@ -562,6 +622,7 @@ export default function Setting() {
                   size="small"
                   variant="outlined"
                   onClick={() => fileInputRef.current?.click()}
+                  disabled={imageUploading}
                   sx={{
                     fontSize: '0.75rem',
                     borderColor: '#e2e8f0',
@@ -569,7 +630,7 @@ export default function Setting() {
                     '&:hover': { borderColor: '#ff8243', color: '#ff8243' },
                   }}
                 >
-                  사진 변경
+                  {imageUploading ? '업로드 중...' : '사진 변경'}
                 </Button>
                 {profile.profileImage && (
                   <Button
@@ -577,6 +638,7 @@ export default function Setting() {
                     variant="outlined"
                     color="error"
                     onClick={handleImageRemove}
+                    disabled={imageUploading}
                     startIcon={<Delete sx={{ fontSize: 14 }} />}
                     sx={{ fontSize: '0.75rem' }}
                   >
