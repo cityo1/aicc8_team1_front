@@ -648,9 +648,13 @@ function AddRecordCard({ onRefresh, userId, selectedDate }) {
                     const mealDate = selectedDate || new Date();
                     const localISOString = new Date(mealDate.getTime() - mealDate.getTimezoneOffset() * 60000).toISOString();
                     formData.append('mealTime', localISOString);
-                    // 사용자가 입력한 servingSize와 calories 전송
+                    // 사용자가 입력한 servingSize, calories, 영양소 전송 (g 변경 시 비율 계산된 값)
                     if (f.servingSize) formData.append('servingSize', f.servingSize);
                     if (f.calories) formData.append('calories', f.calories);
+                    if (f.nutrients?.carbs != null) formData.append('carbohydrate', f.nutrients.carbs);
+                    if (f.nutrients?.protein != null) formData.append('protein', f.nutrients.protein);
+                    if (f.nutrients?.fat != null) formData.append('fat', f.nutrients.fat);
+                    if (f.nutrients?.sugar != null) formData.append('sugars', f.nutrients.sugar);
                     if (memo) formData.append('memo', memo);
                     if (f.imageFile) formData.append('image', f.imageFile);
 
