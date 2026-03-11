@@ -59,8 +59,10 @@ async function refreshToken() {
 // API 요청 함수 (401 시 자동 토큰 갱신)
 async function request(path, options = {}, isRetry = false) {
     const token = getToken();
+    const isFormData = options.body instanceof FormData;
     const headers = {
-        'Content-Type': 'application/json',
+        // FormData일 경우 Content-Type 생략 (브라우저가 자동 설정)
+        ...(!isFormData && { 'Content-Type': 'application/json' }),
         ...(token && { Authorization: `Bearer ${token}` }),
         ...options.headers,
     };
@@ -128,6 +130,17 @@ export const authApi = {
     // 회원탈퇴 (DELETE /api/auth/withdraw)
     withdraw: () =>
         request('/api/auth/withdraw', { method: 'DELETE' }),
+
+    // 프로필 이미지 업로드 (POST /api/auth/profile/image)
+    uploadProfileImage: (file) => {
+        const formData = new FormData();
+        formData.append('profileImage', file);
+        return request('/api/auth/profile/image', { method: 'POST', body: formData });
+    },
+
+    // 프로필 이미지 삭제 (DELETE /api/auth/profile/image)
+    deleteProfileImage: () =>
+        request('/api/auth/profile/image', { method: 'DELETE' }),
 };
 
 // 사용자 관련 API
