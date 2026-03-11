@@ -19,11 +19,14 @@ const FoodCardRecommend = ({
 
   useEffect(() => {
     const fetchAiTags = async () => {
-      if (tags.length > 0 || isLoading) return;
+      // 이미 데이터에 태그가 있거나 로딩 중이면 중단
+      if ((food.tags && food.tags.length > 0) || tags.length > 0) {
+        if (food.tags && tags.length === 0) setTags(food.tags);
+        setIsLoading(false);
+        return;
+      }
 
       setIsLoading(true);
-      const startTime = Date.now();
-
       try {
         const apiKey =
           import.meta.env?.VITE_OPENAI_API_KEY ||
@@ -62,15 +65,11 @@ const FoodCardRecommend = ({
 
         const data = await response.json();
 
-        if (duration < minWait) {
-          await new Promise((resolve) =>
-            setTimeout(resolve, minWait - duration),
-          );
-        }
-
         if (data.choices?.[0]?.message?.content) {
           const aiTags = JSON.parse(data.choices[0].message.content);
           setTags(aiTags);
+          // 부모가 관리하는 food 객체의 tags 속성에 AI 태그 직접 할당
+          food.tags = aiTags;
         }
       } catch (error) {
         console.error('AI 태그 생성 실패:', error);
@@ -145,7 +144,7 @@ const FoodCardRecommend = ({
               key={idx}
               className="flex flex-col items-center justify-center p-2 bg-[#F9FBFA] rounded-xl border border-gray-50"
             >
-              <span className="text-[12px] mb-1">{item.label}</span>
+              <span className="text-[12.5px] mb-2">{item.label}</span>
               <span
                 className={`flex items-center justify-center text-[13.5px] font-bold h-5 ${item.color || 'text-gray-700'} `}
               >
@@ -165,7 +164,7 @@ const FoodCardRecommend = ({
         {tags.map((tag, idx) => (
           <span
             key={idx}
-            className="px-2 py-0.5 bg-[#1E2923] text-[#FF8243] text-[11px] font-bold rounded-md"
+            className="px-2.5 py-1 bg-gray-100 text-gray-500 text-[12px] font-bold rounded-md items-baseline"
           >
             {tag}
           </span>
@@ -189,7 +188,7 @@ const FoodCardRecommend = ({
             e.stopPropagation();
             console.log(food, '비슷한 음식 보기');
           }}
-          className="w-50 py-2 bg-[#ffffff] text-[#FF8243] font-bold rounded-xl shadow-sm border-3 border-[#FF8243] text-[15px] ml-35"
+          className="w-49 py-2 bg-[#ffffff] text-[#FF8243] font-bold rounded-xl shadow-sm border-3 border-[#FF8243] text-[15px] ml-33 hover:bg-gray-50 transition-colors"
         >
           비슷한 음식 보기
         </button>
