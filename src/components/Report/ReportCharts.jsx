@@ -16,41 +16,46 @@ import {
 } from 'recharts';
 
 // 방사형 차트
-export const NutrientRadarChart = ({ data }) => (
-  <ResponsiveContainer width="100%" height={357}>
-    <RadarChart
-      cx="50%"
-      cy="50%"
-      outerRadius="90%"
-      data={data}
-      margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
-    >
-      <PolarGrid stroke="#d0d0d0" opacity={0.8} />
-      <PolarAngleAxis
-        dataKey="subject"
-        tick={{ fill: '#1E2923', fontSize: 14 }}
-      />
-      <PolarRadiusAxis
-        angle={90}
-        domain={[0, 100]}
-        tick={{
-          fill: '#777',
-          fontSize: 12,
-          dy: 8,
-          dx: -8,
-        }}
-        axisLine={false}
-      />
-      <Radar
-        name="영양소"
-        dataKey="value"
-        stroke="#FF8243"
-        fill="#FF8243"
-        fillOpacity={0.5}
-      />
-    </RadarChart>
-  </ResponsiveContainer>
-);
+export const NutrientRadarChart = ({ data }) => {
+  const maxValue = Math.max(...data.map((item) => item.value || 0), 0);
+  const axisMax = maxValue > 0 ? Math.max(100, Math.ceil(maxValue / 10) * 10) : 100;
+
+  return (
+    <ResponsiveContainer width="100%" height={357}>
+      <RadarChart
+        cx="50%"
+        cy="50%"
+        outerRadius="90%"
+        data={data}
+        margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
+      >
+        <PolarGrid stroke="#d0d0d0" opacity={0.8} />
+        <PolarAngleAxis
+          dataKey="subject"
+          tick={{ fill: '#1E2923', fontSize: 14 }}
+        />
+        <PolarRadiusAxis
+          angle={90}
+          domain={[0, axisMax]}
+          tick={{
+            fill: '#777',
+            fontSize: 12,
+            dy: 8,
+            dx: -8,
+          }}
+          axisLine={false}
+        />
+        <Radar
+          name="영양소"
+          dataKey="value"
+          stroke="#FF8243"
+          fill="#FF8243"
+          fillOpacity={0.5}
+        />
+      </RadarChart>
+    </ResponsiveContainer>
+  );
+};
 
 // 7일간 변화 추이
 export const WeeklyLineChart = ({ data }) => {

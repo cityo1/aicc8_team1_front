@@ -14,6 +14,7 @@ import {
   format,
   eachDayOfInterval,
   subWeeks,
+  isSameDay,
 } from 'date-fns';
 
 const ReportPage = () => {
@@ -62,11 +63,16 @@ const ReportPage = () => {
           end: new Date(endDateStr),
         }).map((d) => format(d, 'yyyy-MM-dd'));
 
-        const formattedData = allDays.map((date) => {
-          const found = summaryRes.data.find((item) => item.date === date);
+        const formattedData = allDays.map((dateStr) => {
+          const targetDate = new Date(dateStr);
+          const found = summaryRes.data.find((item) => {
+            const itemDate = new Date(item.date);
+            return isSameDay(itemDate, targetDate);
+          });
+
           return (
             found || {
-              date,
+              date: dateStr,
               kcal: 0,
               carbohydrate: 0,
               protein: 0,
@@ -119,21 +125,52 @@ const ReportPage = () => {
     );
   }, [dailyData]);
 
+  const getAchievementRate = (intake, goal) => {
+    const intakeValue = Number(intake) || 0;
+    const goalValue = Number(goal) || 0;
+    if (goalValue <= 0) return 0;
+    return Math.round((intakeValue / goalValue) * 100);
+  };
+
   // 차트 및 영양소 데이터 가공
-  const radarData = [
-    { subject: '칼로리', value: latestData.kcal > 0 ? 85 : 0 },
-    { subject: '탄수화물', value: latestData.carbohydrate > 0 ? 70 : 0 },
-    { subject: '단백질', value: latestData.protein > 0 ? 90 : 0 },
-    { subject: '지방', value: latestData.fat > 0 ? 60 : 0 },
-    { subject: '당류', value: latestData.sugars > 0 ? 40 : 0 },
-  ];
+  const radarData = useMemo(
+    () => [
+      {
+        subject: '칼로리',
+        value: getAchievementRate(
+          latestData.kcal ?? latestData.calories,
+          goals?.targetCalories,
+        ),
+      },
+      {
+        subject: '탄수화물',
+        value: getAchievementRate(
+          latestData.carbohydrate,
+          goals?.targetCarbohydrate,
+        ),
+      },
+      {
+        subject: '단백질',
+        value: getAchievementRate(latestData.protein, goals?.targetProtein),
+      },
+      {
+        subject: '지방',
+        value: getAchievementRate(latestData.fat, goals?.targetFat),
+      },
+      {
+        subject: '당',
+        value: getAchievementRate(latestData.sugars, goals?.targetSugars),
+      },
+    ],
+    [latestData, goals],
+  );
 
   const nutritionData = [
     {
       id: 1,
       name: '탄수화물',
       inputAmount: latestData.carbohydrate,
-      adviseAmount: goals?.targetCarbs || 0,
+      adviseAmount: goals?.targetCarbohydrate || 0,
     },
     {
       id: 2,
@@ -152,6 +189,12 @@ const ReportPage = () => {
       name: '당류',
       inputAmount: latestData.sugars,
       adviseAmount: goals?.targetSugars || 0,
+    },
+    {
+      id: 5,
+      name: '칼로리',
+      inputAmount: latestData.kcal,
+      adviseAmount: goals?.targetCalories || 0,
     },
   ];
 
