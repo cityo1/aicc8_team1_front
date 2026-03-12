@@ -1,4 +1,9 @@
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';
+const TOKEN_KEY = 'accessToken';
+
+function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
 
 /**
  * 식사 사진 업로드 → AI 영양 분석
@@ -30,13 +35,17 @@ export async function analyzeFoodImage(file) {
  * @returns {Promise<{ success: boolean, data: { ai_scan_id: string } }>}
  */
 export async function saveAiScan({ userId, imageFile, scanResult }) {
+  const token = getToken();
   const formData = new FormData();
   formData.append('image', imageFile);
   formData.append('user_id', userId);
   formData.append('scan_result', JSON.stringify(scanResult));
 
-  const res = await fetch(`${BASE_URL}/api/scan/save-ai`, {
+  const res = await fetch(`${BASE_URL}/api/scan/save-diary`, {
     method: 'POST',
+    headers: {
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
     body: formData,
     credentials: 'include',
   });
