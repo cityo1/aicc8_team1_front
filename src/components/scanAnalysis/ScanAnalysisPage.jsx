@@ -161,8 +161,9 @@ const App = () => {
               macros: { protein, fat, carbs, sugar },
             },
           });
-          if (saveRes?.data?.ai_scan_id) {
-            setAiScanId(saveRes.data.ai_scan_id);
+          const scanId = saveRes?.data?.ai_scan_id || saveRes?.ai_scan_id;
+          if (scanId) {
+            setAiScanId(scanId);
           }
         } catch (saveErr) {
           console.warn('ai_scans 재분석 저장 실패:', saveErr);
@@ -201,12 +202,12 @@ const App = () => {
       computedTotals ??
       (analysis
         ? {
-            calories: analysis.calories,
-            carbs: analysis.macros?.carbs ?? 0,
-            sugar: analysis.macros?.sugar ?? 0,
-            protein: analysis.macros?.protein ?? 0,
-            fat: analysis.macros?.fat ?? 0,
-          }
+          calories: analysis.calories,
+          carbs: analysis.macros?.carbs ?? 0,
+          sugar: analysis.macros?.sugar ?? 0,
+          protein: analysis.macros?.protein ?? 0,
+          fat: analysis.macros?.fat ?? 0,
+        }
         : null);
     if (!totals) return null;
     const userForScore = buildUserForScore(user);
@@ -290,8 +291,9 @@ const App = () => {
             imageFile: file,
             scanResult: { foods, totalCalories, macros: { protein, fat, carbs, sugar } },
           });
-          if (saveRes?.data?.ai_scan_id) {
-            setAiScanId(saveRes.data.ai_scan_id);
+          const scanId = saveRes?.data?.ai_scan_id || saveRes?.ai_scan_id;
+          if (scanId) {
+            setAiScanId(scanId);
           }
         } catch (saveErr) {
           console.warn('ai_scans 저장 실패:', saveErr);
@@ -361,11 +363,10 @@ const App = () => {
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              className={`aspect-square bg-white border-2 border-dashed rounded-[2.5rem] flex flex-col items-center justify-center gap-6 cursor-pointer transition-all group shadow-sm ${
-                isDragOver
+              className={`aspect-square bg-white border-2 border-dashed rounded-[2.5rem] flex flex-col items-center justify-center gap-6 cursor-pointer transition-all group shadow-sm ${isDragOver
                   ? 'border-[#FF8243] bg-orange-50/50 scale-[1.02]'
                   : 'border-slate-300 hover:border-[#FF8243] hover:bg-orange-50/30'
-              }`}
+                }`}
             >
               <div className="w-20 h-20 bg-[#F2F9F5] rounded-full flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner">
                 <Camera
@@ -726,11 +727,10 @@ const App = () => {
                       key={opt.value}
                       type="button"
                       onClick={() => setMealType(opt.value)}
-                      className={`py-3 px-3 rounded-xl font-bold text-sm transition-all ${
-                        mealType === opt.value
+                      className={`py-3 px-3 rounded-xl font-bold text-sm transition-all ${mealType === opt.value
                           ? 'bg-[#FF8243] text-white shadow-md ring-2 ring-[#FF8243]/40'
                           : 'bg-slate-100 text-[#1E2923]/70 hover:bg-slate-200'
-                      }`}
+                        }`}
                     >
                       {opt.label}
                     </button>
@@ -783,7 +783,7 @@ const App = () => {
                         mealType,
                         mealTime: new Date().toISOString(),
                         aiScanId: aiScanId || null,
-                        imageUrl: aiScanId ? null : (selectedImage || null),
+                        imageFile: aiScanId ? null : selectedFile,
                         foods,
                       });
                       navigate('/home/dailyLog');

@@ -194,9 +194,13 @@ function MealCard({ meal, data, isToday, dateStr, nutrientConfig }) {
     // 저장된 메모 배열
     const savedMemos = data?.memos || [];
 
-    // AI 식단분석에서 기록한 경우: ai_scan_id가 있는 음식이 있고, 동일한 사진을 공유함
+    // AI 식단분석에서 기록한 경우: 같은 이미지를 공유하는 음식들은 공통 이미지로 한 번만 표시
+    const allImages = data?.foods?.map((f) => f.image).filter(Boolean) || [];
+    const uniqueImages = [...new Set(allImages)];
+    // 모든 음식이 같은 이미지를 공유하거나, aiScanId가 있는 경우 공통 이미지로 처리
+    const hasSharedImage = uniqueImages.length === 1 && data?.foods?.length > 1;
     const aiScanFood = data?.foods?.find((f) => f.aiScanId && f.image);
-    const aiScanImage = aiScanFood?.image || null;
+    const aiScanImage = hasSharedImage ? uniqueImages[0] : (aiScanFood?.image || null);
 
     return (
         <Paper
@@ -353,8 +357,8 @@ function MealCard({ meal, data, isToday, dateStr, nutrientConfig }) {
                                             </Typography>
                                         </Box>
                                     </Box>
-                                    {/* 사진: AI 스캔(aiScanId) 음식은 위에서 공통 표시했으므로 제외, 수동 추가 음식만 개별 표시 */}
-                                    {food.image && !food.aiScanId && (
+                                    {/* 사진: 공통 이미지로 표시된 경우 제외, 수동 추가 음식만 개별 표시 */}
+                                    {food.image && !food.aiScanId && !hasSharedImage && (
                                         <Box sx={{ mt: 1 }}>
                                             <Box
                                                 component="img"
