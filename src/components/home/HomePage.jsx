@@ -183,7 +183,7 @@ function HomePage() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-4rem)] min-h-0 overflow-y-auto lg:overflow-hidden">
       {/* Left: Nutrition Score - 3분할 (Circle | Today's Intake | 격려) */}
-      <div className="lg:row-span-2 bg-white rounded-2xl p-4 shadow-sm border border-(--color-border) flex flex-col min-h-0 overflow-hidden">
+      <div className="lg:row-span-2 bg-white rounded-2xl p-4 shadow-sm border border-[var(--color-border)] flex flex-col min-h-0 overflow-hidden">
         <h3
           className="text-lg font-semibold mb-2 shrink-0"
           style={{ color: 'var(--color-text)' }}

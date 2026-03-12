@@ -20,28 +20,28 @@ function App() {
     <AuthProvider>
       <ProfileProvider>
         <NotificationProvider>
-        <BrowserRouter>
-          <Routes>
-          {/* 랜딩 페이지 (첫 진입) */}
-          <Route path="/" element={<LandingPage />} />
+          <BrowserRouter>
+            <Routes>
+              {/* 랜딩 페이지 (첫 진입) */}
+              <Route path="/" element={<LandingPage />} />
 
-          {/* 인증 페이지 (Layout 없이 전체 화면) */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              {/* 인증 페이지 (Layout 없이 전체 화면) */}
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
-          {/* 메인 앱 (Layout 포함) */}
-          <Route path="/home" element={<Layout />}>
-            <Route index element={<HomePage />} />
-            <Route path="recommendation" element={<RecommendPage />} />
-            <Route path="scanAnalysis" element={<ScanAnalysisPage />} />
-            <Route path="dailyLog" element={<DailyLogPage />} />
-            <Route path="report" element={<ReportPage />} />
-            <Route path="notifications" element={<Alert />} />
-            <Route path="settings" element={<Setting />} />
-          </Route>
-          </Routes>
-        </BrowserRouter>
+              {/* 메인 앱 (Layout 포함) */}
+              <Route path="/home" element={<Layout />}>
+                <Route index element={<HomePage />} />
+                <Route path="recommendation" element={<RecommendPage />} />
+                <Route path="scanAnalysis" element={<ScanAnalysisPage />} />
+                <Route path="dailyLog" element={<DailyLogPage />} />
+                <Route path="report" element={<ReportPage />} />
+                <Route path="notifications" element={<Alert />} />
+                <Route path="settings" element={<Setting />} />
+              </Route>
+            </Routes>
+          </BrowserRouter>
         </NotificationProvider>
       </ProfileProvider>
     </AuthProvider>
