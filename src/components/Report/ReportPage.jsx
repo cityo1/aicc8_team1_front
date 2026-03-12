@@ -2,183 +2,174 @@ import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { FaPlus, FaMinus, FaPlusMinus } from 'react-icons/fa6';
-import { NutrientRadarChart, WeeklyLineChart } from './ReportCharts';
 import { PiChefHat } from 'react-icons/pi';
-import FoodCardRecommend from '../Recommend/FoodCardRecommend';
+import { Loader2 } from 'lucide-react';
+import { NutrientRadarChart, WeeklyLineChart } from './ReportCharts';
 import ReportCards from './ReportCards';
-import { useProfile } from '../../contexts/ProfileContext';
-import { checkDeficiency } from '../../api/nutrition';
-import { Loader2, Stethoscope } from 'lucide-react';
+import { useProfile } from '../../contexts/ProfileContext'; // 닉네임 사용을 위해 추가
+import { getDailySummaries, getNutritionGoals } from '../../api/nutrition.js';
 import {
-  calculateNutritionScore,
-  buildUserForScore,
-} from '../common/calculateNutritionScore';
+  startOfWeek,
+  endOfWeek,
+  format,
+  eachDayOfInterval,
+  subWeeks,
+} from 'date-fns';
 
 const ReportPage = () => {
   const reportRef = useRef(null);
-  const { profile } = useProfile();
-
-  // API로부터 받아올 원본 데이터 상태
+  const { profile } = useProfile(); // 프로필 정보(닉네임) 가져오기
   const [dailyData, setDailyData] = useState([]);
+  const [lastWeekData, setLastWeekData] = useState([]); // 변화량 계산용
+  const [goals, setGoals] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [foodList, setFoodList] = useState([]);
 
-  // 데이터 받아오기
+  // 현재 주 및 지난 주 날짜 계산
+  const today = new Date();
+  const startDateStr = format(
+    startOfWeek(today, { weekStartsOn: 1 }),
+    'yyyy-MM-dd',
+  );
+  const endDateStr = format(
+    endOfWeek(today, { weekStartsOn: 1 }),
+    'yyyy-MM-dd',
+  );
+
+  const lastWeekStart = format(
+    subWeeks(startOfWeek(today, { weekStartsOn: 1 }), 1),
+    'yyyy-MM-dd',
+  );
+  const lastWeekEnd = format(
+    subWeeks(endOfWeek(today, { weekStartsOn: 1 }), 1),
+    'yyyy-MM-dd',
+  );
+
   useEffect(() => {
-    const fetchDiaryData = async () => {
-      if (!profile?.id) return;
-
-      const API_BASE_URL = 'http://localhost:8000';
-      const userId = profile.id;
-      const today = new Date();
-      const dateStr = today.toISOString().split('T')[0];
-
+    const fetchReport = async () => {
+      setIsLoading(true);
       try {
-        const response = await fetch(
-          `${API_BASE_URL}/api/diary/daily?userId=${userId}&date=${dateStr}`,
-        );
-        if (response.ok) {
-          const result = await response.json();
-          // result가 배열이면 그대로 사용, 단일 객체면 배열로 감쌈
-          setDailyData(Array.isArray(result) ? result : [result]);
-        }
+        // 이번 주 데이터, 지난 주 데이터, 영양 목표를 한 번에 호출
+        const [summaryRes, lastWeekRes, goalRes] = await Promise.all([
+          getDailySummaries(startDateStr, endDateStr),
+          getDailySummaries(lastWeekStart, lastWeekEnd),
+          getNutritionGoals(),
+        ]);
+
+        // 이번 주 7일 데이터 포맷팅
+        const allDays = eachDayOfInterval({
+          start: new Date(startDateStr),
+          end: new Date(endDateStr),
+        }).map((d) => format(d, 'yyyy-MM-dd'));
+
+        const formattedData = allDays.map((date) => {
+          const found = summaryRes.data.find((item) => item.date === date);
+          return (
+            found || {
+              date,
+              kcal: 0,
+              carbohydrate: 0,
+              protein: 0,
+              fat: 0,
+              sugars: 0,
+              score: 0,
+            }
+          );
+        });
+
+        setDailyData(formattedData);
+        setLastWeekData(lastWeekRes.data || []);
+        setGoals(goalRes.data);
       } catch (error) {
         console.error('Data fetch error:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
+    fetchReport();
+  }, [startDateStr, endDateStr, lastWeekStart, lastWeekEnd]);
 
-    fetchDiaryData();
-  }, [profile]);
-
-  // 오늘 먹은 데이터 추출
-  const todayMeal = useMemo(() => {
-    if (dailyData.length === 0)
-      return { calories: 0, carbs: 0, protein: 0, fat: 0, sugar: 0 };
-
-    const latest = dailyData[dailyData.length - 1];
-    return {
-      calories: latest.calories || 0,
-      carbs: latest.carbohydrate || 0,
-      protein: latest.protein || 0,
-      fat: latest.fat || 0,
-      sugar: latest.sugars || 0,
-    };
+  // 이번 주 평균 점수
+  const averageScore = useMemo(() => {
+    if (dailyData.length === 0) return 0;
+    return Math.round(
+      dailyData.reduce((acc, cur) => acc + (cur.score || 0), 0) / 7,
+    );
   }, [dailyData]);
 
-  // 엔진을 이용한 데이터 계산
-  const nutritionResult = useMemo(() => {
-    // 유저 객체 먼저 생성
-    const userForScore = buildUserForScore(profile);
+  // 지난 주 대비 변화량 계산 (diffLastWeek)
+  const diffLastWeek = useMemo(() => {
+    if (lastWeekData.length === 0) return 0;
+    const lastWeekAvg = Math.round(
+      lastWeekData.reduce((acc, cur) => acc + (cur.score || 0), 0) / 7,
+    );
+    return averageScore - lastWeekAvg;
+  }, [averageScore, lastWeekData]);
 
-    // 생성된 유저 객체와 오늘 먹은 데이터를 엔진에 전달
-    return calculateNutritionScore(userForScore, todayMeal);
-  }, [profile, todayMeal]);
+  // 최신 기록 데이터 (오늘 또는 기록된 마지막 날)
+  const latestData = useMemo(() => {
+    return (
+      dailyData.filter((d) => d.kcal > 0).pop() || {
+        kcal: 0,
+        carbohydrate: 0,
+        protein: 0,
+        fat: 0,
+        sugars: 0,
+      }
+    );
+  }, [dailyData]);
 
-  // 목표치 대비 비율(%) 계산
-  const stats = useMemo(() => {
-    const target = nutritionResult.target;
-    const calc = (eaten, goal) =>
-      goal > 0 ? Math.round((eaten / goal) * 100) : 0;
-
-    return {
-      percentKcal: calc(todayMeal.calories, target.calories),
-      percentCarb: calc(todayMeal.carbs, target.carbs),
-      percentProt: calc(todayMeal.protein, target.protein),
-      percentFat: calc(todayMeal.fat, target.fat),
-      percentSug: calc(todayMeal.sugar, target.sugar),
-    };
-  }, [nutritionResult, todayMeal]);
-
-  // 리포트 결과 바인딩
-  const reportResult = {
-    totalScore: nutritionResult.totalScore || 0,
-    userName: profile?.nickname || '??',
-    diffLastWeek:
-      (nutritionResult.lastWeek || 0) - (nutritionResult.totalScore || 0),
-    breakdown: {
-      cal: stats.percentKcal,
-      carb: stats.percentCarb,
-      pro: stats.percentProt,
-      fat: stats.percentFat,
-      sug: stats.percentSug,
-    },
-  };
-
+  // 차트 및 영양소 데이터 가공
   const radarData = [
-    { subject: '칼로리', value: reportResult.breakdown.cal },
-    { subject: '탄수화물', value: reportResult.breakdown.carb },
-    { subject: '단백질', value: reportResult.breakdown.pro },
-    { subject: '지방', value: reportResult.breakdown.fat },
-    { subject: '당류', value: reportResult.breakdown.sug },
+    { subject: '칼로리', value: latestData.kcal > 0 ? 85 : 0 },
+    { subject: '탄수화물', value: latestData.carbohydrate > 0 ? 70 : 0 },
+    { subject: '단백질', value: latestData.protein > 0 ? 90 : 0 },
+    { subject: '지방', value: latestData.fat > 0 ? 60 : 0 },
+    { subject: '당류', value: latestData.sugars > 0 ? 40 : 0 },
   ];
 
   const nutritionData = [
     {
       id: 1,
       name: '탄수화물',
-      inputAmount: todayMeal.carbs,
-      adviseAmount: nutritionResult.target.carbs,
+      inputAmount: latestData.carbohydrate,
+      adviseAmount: goals?.targetCarbs || 0,
     },
     {
       id: 2,
       name: '단백질',
-      inputAmount: todayMeal.protein,
-      adviseAmount: nutritionResult.target.protein,
+      inputAmount: latestData.protein,
+      adviseAmount: goals?.targetProtein || 0,
     },
     {
       id: 3,
       name: '지방',
-      inputAmount: todayMeal.fat,
-      adviseAmount: nutritionResult.target.fat,
+      inputAmount: latestData.fat,
+      adviseAmount: goals?.targetFat || 0,
     },
     {
       id: 4,
       name: '당류',
-      inputAmount: todayMeal.sugar,
-      adviseAmount: nutritionResult.target.sugar,
+      inputAmount: latestData.sugars,
+      adviseAmount: goals?.targetSugars || 0,
     },
   ];
 
-  // 7일간 변화 추이 데이터 바인딩
-  const lineData = useMemo(() => {
-    // API 데이터가 있으면 해당 데이터를 사용, 없으면 빈 7일 생성
-    if (dailyData.length > 0) {
-      return dailyData.slice(-7).map((item) => ({
-        day: item.date ? item.date.slice(5, 10).replace('-', '/') : '??',
-        kcal: item.calories || 0,
-        carbohydrate: item.carbohydrate || 0,
-        protein: item.protein || 0,
-        fat: item.fat || 0,
-        sugars: item.sugars || 0,
-      }));
-    }
+  const lineData = dailyData.map((item) => ({
+    day: item.date.slice(5, 10).replace('-', '/'),
+    kcal: item.kcal,
+    carbohydrate: item.carbohydrate,
+    protein: item.protein,
+    fat: item.fat,
+    sugars: item.sugars,
+  }));
 
-    const data = [];
-    const today = new Date();
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - i);
-      const dateString = `${date.getMonth() + 1}/${date.getDate() < 10 ? '0' + date.getDate() : date.getDate()}`;
-      data.push({
-        day: dateString,
-        kcal: 0,
-        carbohydrate: 0,
-        protein: 0,
-        fat: 0,
-        sugars: 0,
-      });
-    }
-    return data;
-  }, [dailyData]);
-
-  // 추천 식단 임시 데이터
-  const foodList = [];
-
-  // PDF 저장 함수
   const handleDownloadPdf = async () => {
     if (reportRef.current === null) return;
     try {
       const dataUrl = await toPng(reportRef.current, {
         cacheBust: true,
-        backgroundColor: '#ffffff',
+        backgroundColor: '#F2F9F5',
         pixelRatio: 3,
       });
       const pdf = new jsPDF('l', 'mm', 'a4');
@@ -196,6 +187,14 @@ const ReportPage = () => {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen text-[#FF8243]">
+        <Loader2 className="w-12 h-12 animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="p-2 min-h-screen">
       <div
@@ -208,38 +207,40 @@ const ReportPage = () => {
             <div className="bg-white flex justify-between items-center p-5 rounded-xl shadow-sm border-l-8 border-[#FF8243]">
               <h2 className="text-gray-700 text-[19px] mr-4">
                 <span className="text-gray-700 font-semibold text-[22px] pr-1">
-                  {reportResult.userName}
+                  {profile?.nickname || '??'}
                 </span>
                 님의 주간 영양 점수는{' '}
                 <span className="text-[#FF8243] font-bold text-[23px] pr-1">
-                  {reportResult.totalScore}점
+                  {averageScore}점
                 </span>
                 입니다.
               </h2>
               <div className="flex items-center gap-3 shrink-0">
                 <div className="flex items-center whitespace-nowrap gap-2">
-                  <span className="text-gray-600 text-sm mr-1">
+                  <span className="text-gray-600 text-[15px] mt-0.5">
                     지난 주 대비
                   </span>
                   <div
                     className={`flex items-center gap-0.5 font-bold text-[19px] ${
-                      reportResult.diffLastWeek > 0
+                      diffLastWeek > 0
                         ? 'text-emerald-600'
-                        : reportResult.diffLastWeek < 0
+                        : diffLastWeek < 0
                           ? 'text-sky-600'
                           : 'text-gray-600'
                     }`}
                   >
-                    {reportResult.diffLastWeek > 0 ? (
-                      <FaPlus size={15} className="mt-1" />
-                    ) : reportResult.diffLastWeek < 0 ? (
-                      <FaMinus size={15} className="mt-1" />
+                    {diffLastWeek > 0 ? (
+                      <FaPlus size={13} className="mt-0.5" />
+                    ) : diffLastWeek < 0 ? (
+                      <FaMinus size={13} className="mt-0.5" />
                     ) : (
-                      <FaPlusMinus size={15} className="mt-1" />
+                      <FaPlusMinus size={13} className="mt-0.5" />
                     )}
-                    {Math.abs(reportResult.diffLastWeek)}
+                    {Math.abs(diffLastWeek)}
                   </div>
-                  <span className="text-gray-500 text-[19px] -ml-1">점</span>
+                  <span className="text-gray-500 text-[17px] -mt-0.5 -ml-1">
+                    점
+                  </span>
                 </div>
               </div>
             </div>
@@ -289,7 +290,9 @@ const ReportPage = () => {
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <h4 className="font-bold text-sm text-[#FF8243]">개선 포인트</h4>
+                  <h4 className="font-bold text-sm text-[#FF8243]">
+                    개선 포인트
+                  </h4>
                   <ul className="list-disc ml-4 space-y-1 text-xs text-gray-600">
                     <li>정제 탄수화물(흰 쌀밥) 대신 잡곡밥 선택</li>
                     <li>하루 물 2L 섭취 루틴 유지하기</li>
@@ -297,7 +300,9 @@ const ReportPage = () => {
                   </ul>
                 </div>
                 <div className="pt-4 border-t border-gray-100">
-                  <h4 className="font-bold text-sm text-[#FF8243] mb-3">추천 식단 구성</h4>
+                  <h4 className="font-bold text-sm text-[#FF8243] mb-3">
+                    추천 식단 구성
+                  </h4>
                   <div className="flex flex-col gap-3">
                     {foodList.map((item) => (
                       <FoodCardRecommend key={item.id} food={item} />
@@ -306,8 +311,6 @@ const ReportPage = () => {
                 </div>
               </div>
             </div>
-
-            <DeficiencyCheckCard userId={profile?.id} />
           </div>
         </div>
       </div>
@@ -328,7 +331,7 @@ const ReportPage = () => {
 // ─── 영양 결핍 체크 카드 ────────────────────────────────────────────────────
 function DeficiencyCheckCard({ userId }) {
   const [dateStr, setDateStr] = useState(() =>
-    new Date().toISOString().slice(0, 10)
+    new Date().toISOString().slice(0, 10),
   );
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState(null);
@@ -349,7 +352,7 @@ function DeficiencyCheckCard({ userId }) {
       setCheckError(
         err?.response?.data?.message ??
           err?.message ??
-          '결핍 체크에 실패했습니다.'
+          '결핍 체크에 실패했습니다.',
       );
     } finally {
       setChecking(false);
@@ -385,9 +388,7 @@ function DeficiencyCheckCard({ userId }) {
           {checking ? '검사 중...' : '결핍 체크'}
         </button>
       </div>
-      {checkError && (
-        <p className="text-sm text-red-500 mb-2">{checkError}</p>
-      )}
+      {checkError && <p className="text-sm text-red-500 mb-2">{checkError}</p>}
       {result && (
         <div className="space-y-2">
           {result.alerts?.length ? (

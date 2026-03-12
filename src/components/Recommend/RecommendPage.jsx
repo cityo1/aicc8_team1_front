@@ -20,6 +20,9 @@ const RecommendPage = () => {
 
   const [isSortOpen, setIsSortOpen] = useState(false);
   const sortRef = useRef(null);
+  const recommendedFoodsRef = useRef(recommendedFoods);
+  recommendedFoodsRef.current = recommendedFoods;
+
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (sortRef.current && !sortRef.current.contains(e.target)) {
@@ -39,6 +42,55 @@ const RecommendPage = () => {
   useEffect(() => {
     localStorage.setItem('food-favorites', JSON.stringify(favorites));
   }, [favorites]);
+
+  /**
+   * '(' 가 나오기 전까지의 순수 이름만 추출하는 함수
+   * 예: "비빔밥(고추장)" -> "비빔밥", "치킨" -> "치킨"
+   */
+  const getBaseName = (name) => {
+    if (!name) return '';
+    // 괄호가 있으면 분리, 없으면 전체 이름 반환
+    return name.split('(')[0].trim();
+  };
+
+  /**
+   * 중복 여부 확인: 괄호 전(혹은 전체이름)의 앞 4글자가 같은 카드가 있는지 검사
+   */
+  const isDuplicateByName = (name, existingFoods) => {
+    const baseName = getBaseName(name);
+    if (!baseName) return false;
+
+    // 비교 기준: 이름의 앞 4글자 (이름이 4글자 미만이면 전체 이름)
+    const prefix = baseName.slice(0, 4);
+
+    return existingFoods.some((f) => {
+      const existingBase = getBaseName(f.name);
+      return existingBase.slice(0, 4) === prefix;
+    });
+  };
+
+  /**
+   * 새로 추천된 음식 중 기존 리스트와 이름(괄호 제외)이 겹치는 것은 제외하고 병합
+   */
+  const mergeRecommendedFoods = (newFoods, existingFoods) => {
+    const normalized = normalizeData(newFoods);
+    const existing = existingFoods || [];
+    const toAdd = [];
+
+    normalized.forEach((food) => {
+      // 1. 기존 리스트와 비교
+      const isInExisting = isDuplicateByName(food.name, existing);
+      // 2. 현재 새로 추가하려는 리스트 내부에서의 중복 비교 (앞 4글자 기준)
+      const isInNewToAdd = isDuplicateByName(food.name, toAdd);
+
+      if (!isInExisting && !isInNewToAdd) {
+        toAdd.push(food);
+      }
+    });
+
+    // 중복 제외된 새 음식들을 기존 리스트 앞에 추가
+    return [...toAdd, ...existing];
+  };
 
   /**
    * 데이터 정규화 함수
@@ -64,7 +116,16 @@ const RecommendPage = () => {
     try {
       const res = await fetch('http://localhost:8000/api/recommend/random');
       const data = await res.json();
-      setRecommendedFoods(normalizeData(data));
+      const normalized = normalizeData(data);
+
+      // 초기 로드 데이터에서도 앞 4글자 중복 제거
+      const uniqueInitial = [];
+      normalized.forEach((f) => {
+        if (!isDuplicateByName(f.name, uniqueInitial)) {
+          uniqueInitial.push(f);
+        }
+      });
+      setRecommendedFoods(uniqueInitial);
     } catch (err) {
       console.error('초기 로드 실패', err);
     } finally {
@@ -138,10 +199,9 @@ const RecommendPage = () => {
         ]);
 
         if (data.foods && data.foods.length > 0) {
-          setRecommendedFoods((prev) => [
-            ...normalizeData(data.foods),
-            ...prev,
-          ]);
+          const current = recommendedFoodsRef.current;
+          const merged = mergeRecommendedFoods(data.foods, current);
+          setRecommendedFoods(merged);
           triggerLoading();
         }
       }
@@ -209,21 +269,25 @@ const RecommendPage = () => {
         .includes(finalSearchTerm.toLowerCase());
       const matchesTags =
         selectedTags.length === 0 ||
-        selectedTags.every((tag) => food.tags?.includes(tag));
+        selectedTags.every((tag) =>
+          // food.tags 안에 "#고단백" 처럼 tag("고단백")를 포함한 요소가 있는지 확인
+          food.tags?.some((foodTag) => foodTag.includes(tag)),
+        );
       const matchesFavorite = isFavoriteView
         ? favorites.includes(food.id)
         : true;
       return matchesSearch && matchesTags && matchesFavorite;
     })
     .sort((a, b) => {
-      // 이름순 (ㄱ~ㅎ)
-      if (sortType === 'name') return a.name.localeCompare(b.name, 'ko');
-
-      // 오래된순 (ID 오름차순)
-      if (sortType === 'oldest') return a.id - b.id;
-
-      // 최신순 (기본값: ID 내림차순)
-      return b.id - a.id;
+      // 실제 정렬 로직 추가
+      if (sortType === 'name') {
+        return a.name.localeCompare(b.name); // 이름순 (ㄱ-ㅎ)
+      } else if (sortType === 'namereverse') {
+        return b.name.localeCompare(a.name); // 이름역순 (ㅎ-ㄱ)
+      } else {
+        // 최신순 (latest):
+        return 0;
+      }
     });
 
   return (
@@ -234,7 +298,7 @@ const RecommendPage = () => {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #FF8203; border-radius: 10px; }
       `}</style>
 
-      {/* 좌측: AI 챗봇 영역 (비율 1) */}
+      {/* 좌측: AI 챗봇 영역 */}
       <div className="flex-1 bg-white rounded-2xl border border-gray-100 flex flex-col overflow-hidden shadow-sm">
         <div className="p-4 border-b border-gray-100 bg-white shrink-0">
           <h2 className="font-bold flex items-center gap-2">
@@ -264,7 +328,7 @@ const RecommendPage = () => {
           ))}
           {isLoading && (
             <div className="p-3 px-4 rounded-2xl shadow-sm text-sm text-gray-400 bg-white border border-gray-100 rounded-tl-none animate-pulse max-w-[85%]">
-              AI가 최적의 식단을 분석 중입니다...
+              AI가 최적의 식단을 분석 중입니다 ...
             </div>
           )}
         </div>
@@ -291,7 +355,6 @@ const RecommendPage = () => {
 
       {/* 우측: 리스트 영역 */}
       <div className="flex-2 flex flex-col min-w-0 h-full overflow-hidden relative pt-1">
-        {/* 상단 검색 및 필터 바 (고정 높이) */}
         <div className="shrink-0 space-y-2 mb-3 px-2">
           <div className="flex gap-2 items-center">
             <div className="flex-1 relative">
@@ -345,9 +408,7 @@ const RecommendPage = () => {
               ))}
             </div>
 
-            {/* 우측 리스트 상단 정렬 드롭다운 부분 (약 235행 부근) */}
             <div className="relative shrink-0" ref={sortRef}>
-              {/* 드롭다운 실행 버튼 */}
               <button
                 onClick={() => setIsSortOpen(!isSortOpen)}
                 className="flex items-center justify-between gap-2 pl-4 pr-3 py-2.5 bg-white border border-gray-100 rounded-xl text-[14px] font-semibold text-gray-700 shadow-sm hover:border-[#FF8243] hover:shadow-md transition-all min-w-[190px]"
@@ -357,50 +418,43 @@ const RecommendPage = () => {
                   <span className="text-[13px]">
                     {sortType === 'latest'
                       ? '최신순'
-                      : sortType === 'oldest'
-                        ? '오래된순'
-                        : sortType === 'name'
-                          ? '이름순(ㄱ-ㅎ)'
-                          : '이름순(ㅎ-ㄱ)'}
+                      : sortType === 'name'
+                        ? '이름순(ㄱ-ㅎ)'
+                        : '이름순(ㅎ-ㄱ)'}
                   </span>
                 </div>
               </button>
 
-              {/* 펼쳐지는 메뉴 영역 */}
               {isSortOpen && (
-                <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-100 rounded-xl shadow-xl z-100 overflow-hidden animate-slide-down">
-                  <div className="">
-                    {[
-                      { label: '최신순', value: 'latest' },
-                      { label: '오래된순', value: 'oldest' },
-                      { label: '이름순 (ㄱ-ㅎ)', value: 'name' },
-                      { label: '이름순 (ㅎ-ㄱ)', value: 'namereverse' },
-                    ].map((opt) => (
-                      <button
-                        key={opt.value}
-                        onClick={() => {
-                          setSortType(opt.value);
-                          setIsSortOpen(false);
-                          triggerLoading();
-                        }}
-                        className={`w-full flex items-center justify-between px-4 py-2.5 text-[13px] transition-colors hover:bg-gray-50 ${
-                          sortType === opt.value
-                            ? 'text-[#FF8243] font-bold bg-orange-100/50'
-                            : 'text-gray-600'
-                        }`}
-                      >
-                        {opt.label}
-                        {sortType === opt.value && <LuCheck size={14} />}
-                      </button>
-                    ))}
-                  </div>
+                <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden">
+                  {[
+                    { label: '최신순', value: 'latest' },
+                    { label: '이름순 (ㄱ-ㅎ)', value: 'name' },
+                    { label: '이름순 (ㅎ-ㄱ)', value: 'namereverse' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => {
+                        setSortType(opt.value);
+                        setIsSortOpen(false);
+                        triggerLoading();
+                      }}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 text-[13px] transition-colors hover:bg-gray-50 ${
+                        sortType === opt.value
+                          ? 'text-[#FF8243] font-bold bg-orange-100/50'
+                          : 'text-gray-600'
+                      }`}
+                    >
+                      {opt.label}
+                      {sortType === opt.value && <LuCheck size={14} />}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* 결과 리스트 영역 */}
         <div className="flex-1 min-h-0 overflow-y-auto px-2 custom-scrollbar relative">
           {isDataLoading && (
             <div className="sticky top-0 inset-x-0 h-full flex items-center justify-center bg-gray-50/50 z-20">

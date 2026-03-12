@@ -531,10 +531,7 @@ function ActivityScoreChart({ data: scores, summaries, goals }) {
           일별 영양 균형 점수 (0~100점, 높을수록 균형이 좋음)
         </p>
       </div>
-      <div
-        className="flex-1 min-h-0 w-full"
-        style={{ minHeight: 160 }}
-      >
+      <div className="flex-1 min-h-0 w-full" style={{ minHeight: 160 }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={chartData}

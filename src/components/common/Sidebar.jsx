@@ -29,7 +29,11 @@ const Sidebar = () => {
       icon: <Utensils size={20} />,
       label: '식단추천',
     },
-    { path: '/home/scanAnalysis', icon: <Search size={20} />, label: 'AI 식단분석' },
+    {
+      path: '/home/scanAnalysis',
+      icon: <Search size={20} />,
+      label: 'AI 식단분석',
+    },
     {
       path: '/home/dailyLog',
       icon: <ClipboardList size={20} />,
@@ -38,11 +42,15 @@ const Sidebar = () => {
     {
       path: '/home/report',
       icon: <BarChart3 size={20} />,
-      label: '주간/월간리포트',
+      label: '주간리포트',
     },
   ];
 
-  const bellIcon = notificationEnabled ? <Bell size={18} /> : <BellOff size={18} />;
+  const bellIcon = notificationEnabled ? (
+    <Bell size={18} />
+  ) : (
+    <BellOff size={18} />
+  );
   const notificationItem = {
     path: '/home/notifications',
     icon: (
@@ -117,9 +125,7 @@ const Sidebar = () => {
             to={item.path}
             className={({ isActive }) =>
               `w-full flex items-center gap-3 px-4 py-2.5 text-sm rounded-lg transition-all duration-200 ${
-                isActive
-                  ? 'bg-white/15 font-semibold'
-                  : 'hover:bg-white/10'
+                isActive ? 'bg-white/15 font-semibold' : 'hover:bg-white/10'
               }`
             }
             style={{ color: '#f2f9f5' }}
@@ -142,7 +148,9 @@ const Sidebar = () => {
               ) : (
                 <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-md">
                   <span className="text-[#ff8243] font-bold text-sm">
-                    {(profile?.nickname || user?.nickname || '사용자').charAt(0).toUpperCase()}
+                    {(profile?.nickname || user?.nickname || '사용자')
+                      .charAt(0)
+                      .toUpperCase()}
                   </span>
                 </div>
               )}

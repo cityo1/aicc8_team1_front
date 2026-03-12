@@ -19,11 +19,14 @@ const FoodCardRecommend = ({
 
   useEffect(() => {
     const fetchAiTags = async () => {
-      if (tags.length > 0 || isLoading) return;
+      // 이미 데이터에 태그가 있거나 로딩 중이면 중단
+      if ((food.tags && food.tags.length > 0) || tags.length > 0) {
+        if (food.tags && tags.length === 0) setTags(food.tags);
+        setIsLoading(false);
+        return;
+      }
 
       setIsLoading(true);
-      const startTime = Date.now();
-
       try {
         const apiKey =
           import.meta.env?.VITE_OPENAI_API_KEY ||
@@ -62,15 +65,11 @@ const FoodCardRecommend = ({
 
         const data = await response.json();
 
-        if (duration < minWait) {
-          await new Promise((resolve) =>
-            setTimeout(resolve, minWait - duration),
-          );
-        }
-
         if (data.choices?.[0]?.message?.content) {
           const aiTags = JSON.parse(data.choices[0].message.content);
           setTags(aiTags);
+          // 부모가 관리하는 food 객체의 tags 속성에 AI 태그 직접 할당
+          food.tags = aiTags;
         }
       } catch (error) {
         console.error('AI 태그 생성 실패:', error);
@@ -133,10 +132,30 @@ const FoodCardRecommend = ({
             unit: 'kcal',
             color: 'text-[#FF8243]',
           },
-          { label: '탄수화물', value: food.carbs, unit: 'g' },
-          { label: '단백질', value: food.protein, unit: 'g' },
-          { label: '지방', value: food.fat, unit: 'g' },
-          { label: '당', value: food.sugar, unit: 'g' },
+          {
+            label: '탄수화물',
+            value: food.carbs,
+            unit: 'g',
+            color: 'text-[#FFA726]',
+          },
+          {
+            label: '단백질',
+            value: food.protein,
+            unit: 'g',
+            color: 'text-[#66BB6A]',
+          },
+          {
+            label: '지방',
+            value: food.fat,
+            unit: 'g',
+            color: 'text-[#EF5350]',
+          },
+          {
+            label: '당',
+            value: food.sugar,
+            unit: 'g',
+            color: 'text-[#AB47BC]',
+          },
         ].map((item, idx) => {
           const isEmpty = !item.value;
 
@@ -145,7 +164,7 @@ const FoodCardRecommend = ({
               key={idx}
               className="flex flex-col items-center justify-center p-2 bg-[#F9FBFA] rounded-xl border border-gray-50"
             >
-              <span className="text-[12px] mb-1">{item.label}</span>
+              <span className="text-[12.5px] mb-2">{item.label}</span>
               <span
                 className={`flex items-center justify-center text-[13.5px] font-bold h-5 ${item.color || 'text-gray-700'} `}
               >
@@ -160,20 +179,31 @@ const FoodCardRecommend = ({
         })}
       </div>
 
+      <div className="h-px bg-white mb-1" />
+
       {/* 태그 영역 */}
-      <div className="flex flex-wrap gap-1.5 mb-3 min-h-[23px]">
-        {tags.map((tag, idx) => (
-          <span
-            key={idx}
-            className="px-2 py-0.5 bg-[#1E2923] text-[#FF8243] text-[11px] font-bold rounded-md"
-          >
-            {tag}
-          </span>
-        ))}
+      <div className="flex flex-wrap gap-1.5 mb-2 min-h-[26px]">
+        {isLoading && tags.length === 0 ? (
+          <>
+            <div className="w-16 h-[26px] bg-gray-100 rounded-md animate-pulse" />
+            <div className="w-22 h-[26px] bg-gray-100 rounded-md animate-pulse" />
+            <div className="w-10 h-[26px] bg-gray-100 rounded-md animate-pulse" />
+          </>
+        ) : (
+          tags.map((tag, idx) => (
+            <span
+              key={idx}
+              className="px-2.5 py-1 bg-gray-100 text-gray-500 text-[12px] font-bold rounded-md flex items-center justify-center animate-fadeIn"
+            >
+              {tag}
+            </span>
+          ))
+        )}
       </div>
+      <div className="h-px bg-white mb-3" />
 
       {/* 하단: 삭제 및 선택 버튼 */}
-      <div className="flex justify-between items-center">
+      <div className="flex items-center gap-28">
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -184,25 +214,27 @@ const FoodCardRecommend = ({
           <TbTrashX size={23} />
         </button>
 
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            console.log(food, '비슷한 음식 보기');
-          }}
-          className="w-50 py-2 bg-[#ffffff] text-[#FF8243] font-bold rounded-xl shadow-sm border-3 border-[#FF8243] text-[15px] ml-35"
-        >
-          비슷한 음식 보기
-        </button>
+        <div className="flex flex-1 gap-5">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              console.log(food, '비슷한 음식 보기');
+            }}
+            className="flex-1 py-1.5 bg-[#ffffff] text-[#FF8243] font-semibold rounded-xl shadow-sm border-2 border-[#FF8243] text-[15px] hover:bg-gray-50 transition-colors whitespace-nowrap"
+          >
+            비슷한 음식 보기
+          </button>
 
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            navigate('/home/dailyLog');
-          }}
-          className="w-35 py-2 bg-[#FF8243] border-3 border-[#FF8243] text-white font-bold rounded-xl shadow-sm hover:bg-[#e6753d] transition-colors text-[15px]"
-        >
-          선택하기
-        </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate('/home/dailyLog');
+            }}
+            className="flex-1 py-1.5 bg-[#FF8243] border-2 border-[#FF8243] text-white font-bold rounded-xl shadow-sm hover:bg-[#e6753d] hover:border-[#e6753d] transition-colors text-[15px] whitespace-nowrap"
+          >
+            선택하기
+          </button>
+        </div>
       </div>
 
       <style>{`
