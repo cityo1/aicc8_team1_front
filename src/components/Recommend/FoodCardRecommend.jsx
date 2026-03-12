@@ -132,10 +132,30 @@ const FoodCardRecommend = ({
             unit: 'kcal',
             color: 'text-[#FF8243]',
           },
-          { label: '탄수화물', value: food.carbs, unit: 'g' },
-          { label: '단백질', value: food.protein, unit: 'g' },
-          { label: '지방', value: food.fat, unit: 'g' },
-          { label: '당', value: food.sugar, unit: 'g' },
+          {
+            label: '탄수화물',
+            value: food.carbs,
+            unit: 'g',
+            color: 'text-[#FFA726]',
+          },
+          {
+            label: '단백질',
+            value: food.protein,
+            unit: 'g',
+            color: 'text-[#66BB6A]',
+          },
+          {
+            label: '지방',
+            value: food.fat,
+            unit: 'g',
+            color: 'text-[#EF5350]',
+          },
+          {
+            label: '당',
+            value: food.sugar,
+            unit: 'g',
+            color: 'text-[#AB47BC]',
+          },
         ].map((item, idx) => {
           const isEmpty = !item.value;
 
@@ -159,7 +179,7 @@ const FoodCardRecommend = ({
         })}
       </div>
 
-      <div className="h-[1px] bg-white mb-1" />
+      <div className="h-px bg-white mb-1" />
 
       {/* 태그 영역 */}
       <div className="flex flex-wrap gap-1.5 mb-2 min-h-[26px]">
@@ -180,10 +200,10 @@ const FoodCardRecommend = ({
           ))
         )}
       </div>
-      <div className="h-[1px] bg-white mb-3" />
+      <div className="h-px bg-white mb-3" />
 
       {/* 하단: 삭제 및 선택 버튼 */}
-      <div className="flex justify-between items-center">
+      <div className="flex items-center gap-28">
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -194,25 +214,27 @@ const FoodCardRecommend = ({
           <TbTrashX size={23} />
         </button>
 
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            console.log(food, '비슷한 음식 보기');
-          }}
-          className="w-43 py-2 bg-[#ffffff] text-[#FF8243] font-bold rounded-xl shadow-sm border-3 border-[#FF8243] text-[15px] ml-17 hover:bg-gray-50 transition-colors"
-        >
-          비슷한 음식 보기
-        </button>
+        <div className="flex flex-1 gap-5">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              console.log(food, '비슷한 음식 보기');
+            }}
+            className="flex-1 py-1.5 bg-[#ffffff] text-[#FF8243] font-semibold rounded-xl shadow-sm border-2 border-[#FF8243] text-[15px] hover:bg-gray-50 transition-colors whitespace-nowrap"
+          >
+            비슷한 음식 보기
+          </button>
 
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            navigate('/home/dailyLog');
-          }}
-          className="w-35 py-2 bg-[#FF8243] border-3 border-[#FF8243] text-white font-bold rounded-xl shadow-sm hover:bg-[#e6753d] transition-colors text-[15px]"
-        >
-          선택하기
-        </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate('/home/dailyLog');
+            }}
+            className="flex-1 py-1.5 bg-[#FF8243] border-2 border-[#FF8243] text-white font-bold rounded-xl shadow-sm hover:bg-[#e6753d] hover:border-[#e6753d] transition-colors text-[15px] whitespace-nowrap"
+          >
+            선택하기
+          </button>
+        </div>
       </div>
 
       <style>{`
