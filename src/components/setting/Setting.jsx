@@ -388,7 +388,7 @@ export default function Setting() {
   };
 
   // 프로필 이미지 선택 핸들러
-  const handleImageSelect = (e) => {
+  const handleImageSelect = async (e) => {
     const file = e.target.files?.[0];
     if (file) {
       // 파일 크기 체크 (2MB 제한)
@@ -396,22 +396,51 @@ export default function Setting() {
         setError('이미지 크기는 2MB 이하여야 합니다.');
         return;
       }
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setProfileImage(event.target.result);
+
+      setError('');
+      setInfoMessage('');
+
+      try {
+        // 서버에 이미지 업로드
+        const response = await authApi.uploadProfileImage(file);
+
+        // 서버에서 반환한 이미지 URL로 프로필 업데이트
+        const imageUrl = response.data?.profileImage || response.profileImage;
+        if (imageUrl) {
+          setProfileImage(imageUrl);
+        } else {
+          // URL이 없으면 base64로 로컬 표시
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            setProfileImage(event.target.result);
+          };
+          reader.readAsDataURL(file);
+        }
+
         setInfoMessage('프로필 사진이 변경되었습니다.');
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        setError(err.message || '프로필 사진 업로드에 실패했습니다.');
+      }
     }
   };
 
   // 프로필 이미지 삭제 핸들러
-  const handleImageRemove = () => {
-    setProfileImage(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+  const handleImageRemove = async () => {
+    setError('');
+    setInfoMessage('');
+
+    try {
+      // 서버에서 이미지 삭제
+      await authApi.deleteProfileImage();
+
+      setProfileImage(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      setInfoMessage('프로필 사진이 삭제되었습니다.');
+    } catch (err) {
+      setError(err.message || '프로필 사진 삭제에 실패했습니다.');
     }
-    setInfoMessage('프로필 사진이 삭제되었습니다.');
   };
 
   const handleSaveProfile = async () => {

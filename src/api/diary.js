@@ -1,4 +1,9 @@
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';
+const TOKEN_KEY = 'accessToken';
+
+function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
 
 /**
  * AI 식단 분석 결과를 diary_entries에 저장 (ai_scan_id 연동)
@@ -11,6 +16,7 @@ const BASE_URL = import.meta.env.VITE_API_URL ?? '';
  * @param {Array<{ name: string, amount: number, calories: number, carbohydrate: number, protein: number, fat: number, sugars: number }>} params.foods - 음식 목록
  */
 export async function saveScanToDiary({ userId, mealType, mealTime, aiScanId, imageFile, foods }) {
+  const token = getToken();
   const formData = new FormData();
   formData.append('user_id', userId);
   formData.append('meal_type', mealType);
@@ -21,7 +27,9 @@ export async function saveScanToDiary({ userId, mealType, mealTime, aiScanId, im
 
   const res = await fetch(`${BASE_URL}/api/scan/save-diary`, {
     method: 'POST',
-    // Content-Type 생략 (브라우저가 자동 설정)
+    headers: {
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
     body: formData,
     credentials: 'include',
   });
