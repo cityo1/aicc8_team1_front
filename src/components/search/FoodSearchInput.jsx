@@ -44,7 +44,7 @@ export default function FoodSearchInput({ value, onChange, sx }) {
         setIsLoading(true);
         try {
             const response = await fetch(
-                `http://localhost:8000/api/foods/search?name=${encodeURIComponent(query)}`
+                `${import.meta.env.VITE_API_URL}/api/foods/search?name=${encodeURIComponent(query)}`
             );
             if (response.ok) {
                 const result = await response.json();
