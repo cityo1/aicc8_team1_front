@@ -119,7 +119,7 @@ const ReportPage = () => {
     );
   }, [dailyData]);
 
-  // 차트 및 영양소 데이터 가공... (기존과 동일)
+  // 차트 및 영양소 데이터 가공
   const radarData = [
     { subject: '칼로리', value: latestData.kcal > 0 ? 85 : 0 },
     { subject: '탄수화물', value: latestData.carbohydrate > 0 ? 70 : 0 },
@@ -165,7 +165,26 @@ const ReportPage = () => {
   }));
 
   const handleDownloadPdf = async () => {
-    /* 기존과 동일 */
+    if (reportRef.current === null) return;
+    try {
+      const dataUrl = await toPng(reportRef.current, {
+        cacheBust: true,
+        backgroundColor: '#F2F9F5',
+        pixelRatio: 3,
+      });
+      const pdf = new jsPDF('l', 'mm', 'a4');
+      const imgProps = pdf.getImageProperties(dataUrl);
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth;
+      const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+      const marginTop = (pageHeight - imgHeight) / 2;
+      pdf.addImage(dataUrl, 'PNG', 0, marginTop, imgWidth, imgHeight);
+      pdf.save(`HoneyMat_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch (err) {
+      console.error('PDF 생성 오류:', err);
+      alert('PDF 생성 중 오류가 발생했습니다.');
+    }
   };
 
   if (isLoading) {
