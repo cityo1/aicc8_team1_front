@@ -6,9 +6,10 @@ import { TextField, Paper, Box, Typography, CircularProgress } from '@mui/materi
  * @param {Object} props
  * @param {string} props.value - 현재 음식 이름 값
  * @param {function} props.onChange - (name, calories) => void - 음식 선택 또는 직접 입력 시 호출
+ * @param {number|string} props.targetCalories - 자동 선택 시 비교할 기준 칼로리
  * @param {Object} props.sx - TextField에 적용할 스타일
  */
-export default function FoodSearchInput({ value, onChange, sx }) {
+export default function FoodSearchInput({ value, onChange, targetCalories = null, sx }) {
     const [inputValue, setInputValue] = useState(value || '');
     const [searchResults, setSearchResults] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -16,11 +17,8 @@ export default function FoodSearchInput({ value, onChange, sx }) {
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
     const containerRef = useRef(null);
     const debounceTimer = useRef(null);
-
-    // 외부에서 value가 변경되면 inputValue 동기화
-    useEffect(() => {
-        setInputValue(value || '');
-    }, [value]);
+    const isUserTypingRef = useRef(false);
+    const skipExternalSearchOnceRef = useRef(false);
 
     // 컴포넌트 외부 클릭 시 드롭다운 닫기
     useEffect(() => {
@@ -38,7 +36,7 @@ export default function FoodSearchInput({ value, onChange, sx }) {
         if (!query.trim()) {
             setSearchResults([]);
             setShowDropdown(false);
-            return;
+            return [];
         }
 
         setIsLoading(true);
@@ -53,22 +51,98 @@ export default function FoodSearchInput({ value, onChange, sx }) {
                 setSearchResults(foods);
                 setShowDropdown(foods.length > 0);
                 setHighlightedIndex(-1);
+                return foods;
             } else {
                 setSearchResults([]);
                 setShowDropdown(false);
+                return [];
             }
         } catch (error) {
             console.error('음식 검색 실패:', error);
             setSearchResults([]);
             setShowDropdown(false);
+            return [];
         } finally {
             setIsLoading(false);
         }
     };
 
+    const getBestMatch = (foods, query, targetKcal) => {
+        if (!foods.length) return null;
+
+        const normalizedQuery = (query || '').toLowerCase().replace(/\s+/g, '');
+        const target = Number(targetKcal);
+        const hasTargetCalories = Number.isFinite(target) && target > 0;
+
+        const calcNameScore = (name) => {
+            const normalizedName = (name || '').toLowerCase().replace(/\s+/g, '');
+            if (!normalizedQuery || !normalizedName) return 0;
+            if (normalizedName === normalizedQuery) return 100;
+            if (normalizedName.startsWith(normalizedQuery)) return 80;
+            if (normalizedName.includes(normalizedQuery)) return 60;
+            if (normalizedQuery.includes(normalizedName)) return 40;
+            return 0;
+        };
+
+        const calcCalorieScore = (calories) => {
+            if (!hasTargetCalories) return 0;
+            const candidate = Number(calories) || 0;
+            const diff = Math.abs(candidate - target);
+            return Math.max(0, 60 - diff);
+        };
+
+        return foods
+            .map((food) => {
+                const nameScore = calcNameScore(food.food_name);
+                const calorieScore = calcCalorieScore(food.calories);
+                const totalScore = nameScore + calorieScore;
+                const calorieDiff = hasTargetCalories
+                    ? Math.abs((Number(food.calories) || 0) - target)
+                    : Number.MAX_SAFE_INTEGER;
+                return { food, totalScore, calorieDiff };
+            })
+            .sort((a, b) => {
+                if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
+                return a.calorieDiff - b.calorieDiff;
+            })[0]?.food || null;
+    };
+
+    // 외부에서 value가 변경되면 inputValue 동기화 + 자동 검색(초기값 주입 케이스)
+    useEffect(() => {
+        const nextValue = value || '';
+        setInputValue(nextValue);
+
+        if (skipExternalSearchOnceRef.current) {
+            skipExternalSearchOnceRef.current = false;
+            return;
+        }
+
+        // 사용자가 직접 타이핑한 경우에는 기존 디바운스 검색 흐름 유지
+        if (isUserTypingRef.current) {
+            isUserTypingRef.current = false;
+            return;
+        }
+
+        if (!nextValue.trim()) {
+            setSearchResults([]);
+            setShowDropdown(false);
+            return;
+        }
+
+        const autoSearchAndSelect = async () => {
+            const foods = await searchFoods(nextValue);
+            const bestMatch = getBestMatch(foods, nextValue, targetCalories);
+            if (bestMatch) {
+                handleSelect(bestMatch);
+            }
+        };
+        autoSearchAndSelect();
+    }, [value, targetCalories]);
+
     // 입력 변경 핸들러 (디바운스 적용)
     const handleInputChange = (e) => {
         const newValue = e.target.value;
+        isUserTypingRef.current = true;
         setInputValue(newValue);
         onChange(newValue, '', null); // 직접 입력 시 칼로리와 영양소는 비움
 
@@ -83,6 +157,7 @@ export default function FoodSearchInput({ value, onChange, sx }) {
 
     // 검색 결과 선택 핸들러
     const handleSelect = (food) => {
+        skipExternalSearchOnceRef.current = true;
         setInputValue(food.food_name);
         // 영양소 정보, food_code, serving_size, calories 함께 전달
         onChange(food.food_name, Math.round(Number(food.calories)) || 0, {

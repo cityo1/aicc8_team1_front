@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useLocation } from 'react-router-dom'; // 추천 페이지에서 전달된 state 읽기용
 import {
     Box,
     Paper,
@@ -504,18 +504,34 @@ const EMPTY_FOOD = () => ({
     imageFile: null,  // 서버 전송용 File 객체
 });
 
-function AddRecordCard({ onRefresh, userId, selectedDate }) {
+function AddRecordCard({ onRefresh, userId, selectedDate, initialFoodName = '', initialFoodKcal = '' }) { // 외부에서 전달된 초기 음식명
     const [open, setOpen] = useState(false);
     const [selectedMeal, setSelectedMeal] = useState('breakfast');
     const [foods, setFoods] = useState([EMPTY_FOOD()]);
     const [memo, setMemo] = useState('');
     const fileInputRefs = useRef([]);
+    const hasAppliedInitialFood = useRef(false); // 초기 음식명 자동 주입을 1회로 제한
 
     const selectedMealInfo = MEALS.find((m) => m.key === selectedMeal);
     const totalCalories = foods.reduce(
         (sum, f) => sum + (Number(f.calories) || 0),
         0,
     );
+
+    useEffect(() => {
+        // 선택한 음식명을 "기록 추가" 첫 번째 입력칸에 최초 1회만 반영
+        const trimmedName = initialFoodName.trim();
+        if (!trimmedName || hasAppliedInitialFood.current) return;
+
+        // "선택하기"로 넘어온 경우 기록 추가 카드를 자동으로 펼침
+        setOpen(true);
+        setFoods((prev) => {
+            if (!prev.length) return [{ ...EMPTY_FOOD(), name: trimmedName }];
+            if (prev[0].name.trim()) return prev;
+            return prev.map((food, index) => (index === 0 ? { ...food, name: trimmedName } : food));
+        });
+        hasAppliedInitialFood.current = true;
+    }, [initialFoodName]);
 
     const handleFoodChange = (index, field, value) => {
         setFoods((prev) =>
@@ -816,6 +832,7 @@ function AddRecordCard({ onRefresh, userId, selectedDate }) {
                                             {/* 음식 이름 (검색 자동완성) */}
                                             <FoodSearchInput
                                                 value={food.name}
+                                                targetCalories={index === 0 ? initialFoodKcal : null}
                                                 onChange={(name, calories, nutrients) =>
                                                     handleFoodSelect(index, name, calories, nutrients)
                                                 }
@@ -1430,6 +1447,9 @@ function NutritionSummaryPanel({ date, data }) {
 export default function DailyLogPage() {
     const { user } = useAuth();
     const { profile } = useProfile();
+    const location = useLocation(); // navigate(..., { state })로 넘어온 데이터
+    const prefilledFoodName = location.state?.food?.name || ''; // 추천 카드에서 선택한 음식명
+    const prefilledFoodKcal = location.state?.food?.kcal || location.state?.food?.calories || ''; // 추천 카드에서 선택한 칼로리
 
     // 사용자 프로필 기반 식사별 동적 영양소 권장량 계산
     const mealTargets = useMemo(() => calculateMealTargets(profile), [profile]);
@@ -1710,7 +1730,13 @@ export default function DailyLogPage() {
                         <Box sx={{ display: 'flex', gap: 2, mt: 1.5 }}>
                             <Box sx={{ width: 20, flexShrink: 0 }} />
                             <Box sx={{ flexGrow: 1 }}>
-                                <AddRecordCard onRefresh={handleRefreshData} userId={user?.id} selectedDate={selectedDate} />
+                                <AddRecordCard
+                                    onRefresh={handleRefreshData}
+                                    userId={user?.id}
+                                    selectedDate={selectedDate}
+                                    initialFoodName={prefilledFoodName} // AddRecordCard 초기 음식명 전달
+                                    initialFoodKcal={prefilledFoodKcal}
+                                />
                             </Box>
                         </Box>
                     </Stack>
