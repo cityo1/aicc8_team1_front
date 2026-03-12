@@ -114,7 +114,7 @@ const RecommendPage = () => {
   const fetchRandomFoods = async () => {
     setIsDataLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/recommend/random');
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/recommend/random`);
       const data = await res.json();
       const normalized = normalizeData(data);
 
@@ -178,7 +178,7 @@ const RecommendPage = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/api/recommend/save', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/recommend/save`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
