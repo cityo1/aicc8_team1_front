@@ -43,7 +43,7 @@ import { getNutritionGoals } from '../api/nutrition.js';
 import { calculateMealTargets } from '../components/common/calculateNutritionScore';
 
 // ─── API 기본 URL ──────────────────────────────────────────────────────────
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 // ─── 상수 ────────────────────────────────────────────────────────────────────
 const MEALS = [
