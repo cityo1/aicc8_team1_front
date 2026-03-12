@@ -1,5 +1,15 @@
 import { useEffect, useState, useMemo } from 'react';
-import { ChevronRight, Loader2 } from 'lucide-react';
+import {
+  Box,
+  Paper,
+  Typography,
+  Stack,
+  LinearProgress,
+  Chip,
+  CircularProgress,
+  Button,
+} from '@mui/material';
+import { ChevronRight } from '@mui/icons-material';
 import {
   LineChart,
   Line,
@@ -22,11 +32,11 @@ const ACTIVITY_DATA_FALLBACK = [0, 0, 0, 0, 0, 0, 0];
 
 // 영양소별 색상
 const INTAKE_CONFIG = {
-  calories: { unit: 'kcal', color: '#ff8243' },
-  carbs: { unit: 'g', color: '#2dd4bf' },
-  sugars: { unit: 'g', color: '#a78bfa' },
-  protein: { unit: 'g', color: '#f59e0b' },
-  fat: { unit: 'g', color: '#ec4899' },
+  calories: { label: 'Calories', unit: 'kcal', color: '#FF8243' },
+  carbs: { label: 'Carbs', unit: 'g', color: '#FFA726' },
+  sugars: { label: 'Sugars', unit: 'g', color: '#AB47BC' },
+  protein: { label: 'Protein', unit: 'g', color: '#66BB6A' },
+  fat: { label: 'Fat', unit: 'g', color: '#EF5350' },
 };
 
 function HomePage() {
@@ -121,8 +131,8 @@ function HomePage() {
         if (cancelled) return;
         setError(
           err?.response?.data?.message ??
-            err?.message ??
-            '데이터를 불러오는데 실패했습니다.',
+          err?.message ??
+          '데이터를 불러오는데 실패했습니다.',
         );
         setNutritionScore(0);
         setIntakeData(null);
@@ -152,54 +162,99 @@ function HomePage() {
 
   if (loading) {
     return (
-      <div
-        className="flex items-center justify-center h-[calc(100vh-4rem)]"
-        style={{ color: 'var(--color-text-muted)' }}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: 'calc(100vh - 4rem)',
+        }}
       >
-        <Loader2 className="w-12 h-12 animate-spin" />
-      </div>
+        <CircularProgress sx={{ color: '#FF8243' }} />
+      </Box>
     );
   }
 
   if (error) {
     return (
-      <div
-        className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] gap-4"
-        style={{ color: 'var(--color-text)' }}
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: 'calc(100vh - 4rem)',
+          gap: 2,
+        }}
       >
-        <p className="text-lg">{error}</p>
-        <button
-          type="button"
+        <Typography variant="h6" color="text.secondary">
+          {error}
+        </Typography>
+        <Button
+          variant="contained"
           onClick={() => window.location.reload()}
-          className="px-4 py-2 rounded-lg text-white"
-          style={{ backgroundColor: 'var(--color-brand)' }}
+          sx={{ bgcolor: '#FF8243', '&:hover': { bgcolor: '#e5743c' } }}
         >
           다시 시도
-        </button>
-      </div>
+        </Button>
+      </Box>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-4rem)] min-h-0 overflow-y-auto lg:overflow-hidden">
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: { xs: '1fr', lg: '1fr 2fr' },
+        gap: 2,
+        height: 'calc(100vh - 4rem)',
+        minHeight: 0,
+        overflow: { xs: 'auto', lg: 'hidden' },
+        p: 2,
+      }}
+    >
       {/* Left: Nutrition Score - 3분할 (Circle | Today's Intake | 격려) */}
-      <div className="lg:row-span-2 bg-white rounded-2xl p-4 shadow-sm border border-[var(--color-border)] flex flex-col min-h-0 overflow-hidden">
-        <h3
-          className="text-lg font-semibold mb-2 shrink-0"
-          style={{ color: 'var(--color-text)' }}
-        >
+      <Paper
+        elevation={0}
+        sx={{
+          gridRow: { lg: 'span 2' },
+          border: '1px solid #e8ecf0',
+          borderRadius: 3,
+          p: 2.5,
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
+          overflow: 'hidden',
+        }}
+      >
+        <Typography fontWeight={700} fontSize="1.1rem" mb={1}>
           Nutrition Score
-        </h3>
-        {/* 1번: Circle 영역 - 1/3 */}
-        <div className="flex-1 min-h-0 flex flex-col items-center justify-center border-b border-[var(--color-border)] py-2">
-          <div className="relative w-60 h-60 flex items-center justify-center">
-            <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+        </Typography>
+
+        {/* 1번: Circle 영역 */}
+        <Box
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderBottom: '1px solid #e8ecf0',
+            py: 2,
+          }}
+        >
+          <Box sx={{ position: 'relative', width: 200, height: 200 }}>
+            <svg
+              style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}
+              viewBox="0 0 100 100"
+            >
               <circle
                 cx="50"
                 cy="50"
                 r="42"
                 fill="none"
-                stroke="var(--color-border)"
+                stroke="#e8ecf0"
                 strokeWidth="8"
               />
               <circle
@@ -207,163 +262,265 @@ function HomePage() {
                 cy="50"
                 r="42"
                 fill="none"
-                stroke="var(--color-brand)"
+                stroke="#FF8243"
                 strokeWidth="8"
                 strokeLinecap="round"
                 strokeDasharray={`${(nutritionScore / 100) * 264} 264`}
               />
             </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span
-                className="font-bold text-4xl"
-                style={{ color: 'var(--color-text)' }}
-              >
+            <Box
+              sx={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Typography fontWeight={600} fontSize="2.5rem" color="text.primary">
                 {nutritionScore}
-              </span>
-              <span
-                className="text-xl"
-                style={{ color: 'var(--color-text-muted)' }}
-              >
+              </Typography>
+              <Typography fontSize="1rem" color="text.secondary">
                 / 100점
-              </span>
-            </div>
-          </div>
-        </div>
-        {/* 2번: Today's Intake 영역 - 1/3 */}
-        <div className="flex-1 min-h-0 flex flex-col py-2 border-b border-[var(--color-border)] overflow-hidden">
-          <p
-            className="text-lg mb-1 w-full shrink-0"
-            style={{ color: 'var(--color-text-muted)' }}
-          >
-            Today&apos;s Intake
-          </p>
-          <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5">
-            {Object.entries(displayData).map(
-              ([key, { current, goal, unit, color }]) => (
-                <div key={key} className="shrink-0">
-                  <div className="flex justify-between text-lg mb-0.5">
-                    <span style={{ color: 'var(--color-text)' }}>
-                      {key === 'calories'
-                        ? 'Calories'
-                        : key === 'sugars'
-                          ? 'Sugars'
-                          : key.charAt(0).toUpperCase() + key.slice(1)}
-                    </span>
-                    <span
-                      className="font-medium"
-                      style={{ color: 'var(--color-text-muted)' }}
-                    >
-                      {current.toLocaleString?.() ?? current} /{' '}
-                      {goal.toLocaleString?.() ?? goal} {unit}
-                    </span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-[var(--color-border)] overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all"
-                      style={{
-                        width: `${Math.min((current / goal) * 100, 100)}%`,
-                        backgroundColor: color,
-                      }}
-                    />
-                  </div>
-                </div>
-              ),
-            )}
-          </div>
-        </div>
-        {/* 3번: 오늘의 추천 한 줄 문구 영역 - 1/3 */}
-        <div
-          className="flex-1 min-h-0 flex flex-col items-center justify-center text-center p-2 mt-4"
-          style={{
-            backgroundColor: 'rgba(255, 130, 67, 0.08)',
-            border: '1px solid rgba(255, 130, 67, 0.2)',
-            borderRadius: '0.75rem',
+              </Typography>
+            </Box>
+          </Box>
+        </Box>
+
+        {/* 2번: Today's Intake 영역 */}
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            py: 2,
+            borderBottom: '1px solid #e8ecf0',
           }}
         >
-          <p
-            className="text-lg font-semibold leading-relaxed"
-            style={{ color: 'var(--color-text)' }}
-          >
-            {todayRecommend?.message ?? (
-              <>
-                <span className="text-2xl block mb-0.5">✨</span>
-                오늘도 건강한 하루 되세요!
-              </>
+          <Typography fontSize="0.95rem" color="text.secondary" mb={1}>
+            Today&apos;s Intake
+          </Typography>
+          <Stack spacing={1.5}>
+            {Object.entries(displayData).map(
+              ([key, { current, goal, unit, color, label }]) => (
+                <Box key={key}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      mb: 0.5,
+                    }}
+                  >
+                    <Typography variant="body2" fontWeight={500}>
+                      {label}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" fontWeight={600}>
+                      {current.toLocaleString?.()} / {goal.toLocaleString?.()} {unit}
+                    </Typography>
+                  </Box>
+                  <LinearProgress
+                    variant="determinate"
+                    value={Math.min((current / goal) * 100, 100)}
+                    sx={{
+                      height: 6,
+                      borderRadius: 3,
+                      bgcolor: '#f0f0f0',
+                      '& .MuiLinearProgress-bar': {
+                        bgcolor: color,
+                        borderRadius: 3,
+                      },
+                    }}
+                  />
+                </Box>
+              ),
             )}
-          </p>
-        </div>
-      </div>
+          </Stack>
+        </Box>
+
+        {/* 3번: 오늘의 추천 한 줄 문구 영역 */}
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            p: 2.5,
+            mt: 2,
+            background: 'linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%)',
+            borderRadius: 3,
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: -20,
+              right: -20,
+              width: 80,
+              height: 80,
+              borderRadius: '50%',
+              background: 'rgba(255, 130, 67, 0.15)',
+            },
+            '&::after': {
+              content: '""',
+              position: 'absolute',
+              bottom: -30,
+              left: -30,
+              width: 100,
+              height: 100,
+              borderRadius: '50%',
+              background: 'rgba(255, 130, 67, 0.1)',
+            },
+          }}
+        >
+          <Box
+            sx={{
+              width: 48,
+              height: 48,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #FF8243 0%, #F97316 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              boxShadow: '0 4px 12px rgba(255, 130, 67, 0.3)',
+              zIndex: 1,
+            }}
+          >
+            <Typography fontSize="1.4rem">💡</Typography>
+          </Box>
+          <Box sx={{ zIndex: 1 }}>
+            <Typography
+              variant="caption"
+              sx={{
+                color: '#EA580C',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: 0.5,
+              }}
+            >
+              Today&apos;s Tip
+            </Typography>
+            <Typography
+              fontWeight={500}
+              fontSize="0.95rem"
+              color="text.primary"
+              lineHeight={1.5}
+              sx={{ mt: 0.5 }}
+            >
+              {todayRecommend?.message ?? '오늘도 건강한 하루 되세요!'}
+            </Typography>
+          </Box>
+        </Box>
+      </Paper>
 
       {/* Right Top: AI Recommended Meal 미리보기 */}
-      <div className="lg:col-span-2 bg-white rounded-2xl p-4 shadow-sm border border-[var(--color-border)] flex flex-col min-h-0 overflow-hidden">
-        <h3
-          className="text-base font-semibold mb-3 shrink-0"
-          style={{ color: 'var(--color-text)' }}
-        >
+      <Paper
+        elevation={0}
+        sx={{
+          gridColumn: { lg: 'span 1' },
+          border: '1px solid #e8ecf0',
+          borderRadius: 3,
+          p: 2.5,
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
+          overflow: 'hidden',
+        }}
+      >
+        <Typography fontWeight={700} fontSize="1rem" mb={2}>
           AI Recommended Meal
-        </h3>
+        </Typography>
 
         {/* 태그 필터 미리보기 */}
-        <div className="flex flex-wrap gap-2 mb-4 shrink-0">
-          {['고단백', '다이어트', '채소', '저탄수', '저당', '과일'].map(
-            (tag) => (
-              <Link
-                key={tag}
-                to={{
-                  pathname: '/home/recommendation',
-                  state: { selectedTag: tag },
-                }}
-                className="px-3 py-1.5 rounded-full text-xs font-medium bg-gray-50 hover:bg-[#FF8243] hover:text-white transition-colors"
-                style={{ color: '#64748b' }}
-              >
-                #{tag}
-              </Link>
-            ),
-          )}
-        </div>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+          {['고단백', '다이어트', '채소', '저탄수', '저당', '과일'].map((tag) => (
+            <Chip
+              key={tag}
+              label={`#${tag}`}
+              component={Link}
+              to={{ pathname: '/home/recommendation', state: { selectedTag: tag } }}
+              clickable
+              size="small"
+              sx={{
+                bgcolor: '#f8fafc',
+                color: '#64748b',
+                fontWeight: 500,
+                fontSize: '0.75rem',
+                '&:hover': { bgcolor: '#FF8243', color: '#fff' },
+              }}
+            />
+          ))}
+        </Stack>
 
         {/* 추천 식품 3개 미리보기 */}
         {todayRecommend?.foods?.length > 0 ? (
-          <div className="flex-1 min-h-0 grid grid-cols-3 gap-4 pb-2">
+          <Box
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: 2,
+              pb: 1,
+            }}
+          >
             {(todayRecommend.foods || []).slice(0, 3).map((food) => (
               <RecommendPreviewCard key={food.id} food={food} />
             ))}
-          </div>
+          </Box>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-sm py-8 text-gray-400">
-            추천을 불러오는 중...
-          </div>
+          <Box
+            sx={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'text.secondary',
+            }}
+          >
+            <Typography variant="body2">추천을 불러오는 중...</Typography>
+          </Box>
         )}
 
         {/* Recommend 페이지 이동 버튼 */}
-        <Link
+        <Button
+          component={Link}
           to="/home/recommendation"
-          className="mt-4 shrink-0 flex items-center justify-center gap-2 py-3 px-5 rounded-xl text-sm font-semibold text-white shadow-sm hover:shadow-md transition-all"
-          style={{ backgroundColor: '#FF8243' }}
+          variant="contained"
+          endIcon={<ChevronRight />}
+          sx={{
+            mt: 2,
+            bgcolor: '#FF8243',
+            '&:hover': { bgcolor: '#e5743c' },
+            borderRadius: 2,
+            fontWeight: 600,
+            py: 1.2,
+          }}
         >
           식단 추천 페이지로 이동
-          <ChevronRight size={18} strokeWidth={2.5} />
-        </Link>
-      </div>
+        </Button>
+      </Paper>
 
-      {/* Right Middle: 최근 7일 영양 점수 추이 */}
+      {/* Right Bottom: 최근 7일 영양 점수 추이 */}
       <ActivityScoreChart
         data={activityData.length ? activityData : ACTIVITY_DATA_FALLBACK}
         summaries={activitySummaries}
         goals={activityGoals}
       />
-    </div>
+    </Box>
   );
 }
 
-// ─── 추천 식품 미리보기 카드 (홈 전용, 가독성 개선) ─────────────────────────────────
+// ─── 추천 식품 미리보기 카드 ─────────────────────────────────────────────────
 function RecommendPreviewCard({ food }) {
   const items = [
     { label: '칼로리', val: food.kcal, unit: 'kcal', color: '#FF8243' },
     { label: '탄수화물', val: food.carbs, unit: 'g', color: '#6b7280' },
-    { label: '단백질', val: food.protein, unit: 'g', color: '#059669' },
-    { label: '지방', val: food.fat, unit: 'g', color: '#dc2626' },
-    { label: '당', val: food.sugar, unit: 'g', color: '#7c3aed' },
+    { label: '단백질', val: food.protein, unit: 'g', color: '#66BB6A' },
+    { label: '지방', val: food.fat, unit: 'g', color: '#EF5350' },
+    { label: '당', val: food.sugar, unit: 'g', color: '#AB47BC' },
   ];
   const format = (v, u) =>
     v != null && v !== ''
@@ -371,65 +528,68 @@ function RecommendPreviewCard({ food }) {
       : '-';
 
   return (
-    <Link
+    <Paper
+      component={Link}
       to="/home/recommendation"
-      className="min-w-0 p-4 rounded-xl bg-gray-50/80 hover:bg-orange-50/80 border border-gray-100 hover:border-[#FF8243]/30 transition-all group flex flex-col"
+      elevation={0}
+      sx={{
+        p: 2,
+        borderRadius: 2,
+        bgcolor: '#f8fafc',
+        border: '1px solid #e8ecf0',
+        textDecoration: 'none',
+        transition: 'all 0.2s',
+        '&:hover': {
+          bgcolor: 'rgba(255, 130, 67, 0.05)',
+          borderColor: 'rgba(255, 130, 67, 0.3)',
+        },
+      }}
     >
-      <p
-        className="font-semibold text-gray-800 truncate mb-3 group-hover:text-[#FF8243] transition-colors"
-        title={food.name}
+      <Typography
+        fontWeight={600}
+        fontSize="0.9rem"
+        color="text.primary"
+        sx={{
+          mb: 1.5,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
       >
         {food.name}
-      </p>
-      <div className="space-y-1.5 text-xs">
+      </Typography>
+      <Stack spacing={0.5}>
         {items.map(({ label, val, unit, color }) => (
-          <div
+          <Box
             key={label}
-            className="flex justify-between items-baseline gap-2"
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
           >
-            <span className="text-gray-500 shrink-0">{label}</span>
-            <span className="font-semibold tabular-nums" style={{ color }}>
+            <Typography variant="caption" color="text.secondary">
+              {label}
+            </Typography>
+            <Typography variant="caption" fontWeight={600} sx={{ color }}>
               {format(val, unit)}
-            </span>
-          </div>
+            </Typography>
+          </Box>
         ))}
-      </div>
-    </Link>
+      </Stack>
+    </Paper>
   );
 }
 
-// 일일식사기록 영양 목표와 동일한 항목 (칼로리, 탄수화물, 단백질, 지방, 당류)
+// ─── 일일식사기록 영양 목표와 동일한 항목 ─────────────────────────────────────
 const NUTRIENT_ITEMS = [
-  {
-    key: 'calories',
-    label: '칼로리',
-    apiKey: 'calories',
-    unit: 'kcal',
-    color: '#FF8243',
-  },
-  {
-    key: 'carbs',
-    label: '탄수화물',
-    apiKey: 'carbohydrate',
-    unit: 'g',
-    color: '#FFA726',
-  },
-  {
-    key: 'protein',
-    label: '단백질',
-    apiKey: 'protein',
-    unit: 'g',
-    color: '#66BB6A',
-  },
+  { key: 'calories', label: '칼로리', apiKey: 'calories', unit: 'kcal', color: '#FF8243' },
+  { key: 'carbs', label: '탄수화물', apiKey: 'carbohydrate', unit: 'g', color: '#FFA726' },
+  { key: 'protein', label: '단백질', apiKey: 'protein', unit: 'g', color: '#66BB6A' },
   { key: 'fat', label: '지방', apiKey: 'fat', unit: 'g', color: '#EF5350' },
-  {
-    key: 'sugars',
-    label: '당류',
-    apiKey: 'sugars',
-    unit: 'g',
-    color: '#AB47BC',
-  },
+  { key: 'sugars', label: '당류', apiKey: 'sugars', unit: 'g', color: '#AB47BC' },
 ];
+
 const GOAL_KEYS = {
   calories: 'targetCalories',
   carbs: 'targetCarbohydrate',
@@ -469,22 +629,25 @@ function ActivityScoreChart({ data: scores, summaries, goals }) {
       goals &&
       (goals.targetCalories != null || goals.targetCarbohydrate != null);
     return (
-      <div
-        className="px-2.5 py-2 rounded-lg shadow-lg text-xs"
-        style={{
-          backgroundColor: '#fff',
-          border: '1px solid #e5e7eb',
-          minWidth: 140,
+      <Paper
+        elevation={3}
+        sx={{
+          px: 2,
+          py: 1.5,
+          borderRadius: 2,
+          minWidth: 160,
         }}
       >
-        <div className="flex justify-between items-baseline mb-1.5">
-          <span style={{ color: '#6b7280' }}>{row.day}</span>
-          <span className="font-semibold ml-2" style={{ color: '#FF8243' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+          <Typography variant="caption" color="text.secondary">
+            {row.day}
+          </Typography>
+          <Typography variant="body2" fontWeight={700} sx={{ color: '#FF8243', ml: 2 }}>
             {row.score}점
-          </span>
-        </div>
+          </Typography>
+        </Box>
         {hasGoals && (
-          <div className="space-y-1">
+          <Stack spacing={0.75}>
             {NUTRIENT_ITEMS.map(({ key, label, apiKey, unit, color }) => {
               const current = row[apiKey] ?? 0;
               const goal = Number(goals[GOAL_KEYS[key]]) || 1;
@@ -494,54 +657,68 @@ function ActivityScoreChart({ data: scores, summaries, goals }) {
                   ? `${Math.round(current)} / ${Math.round(goal)}`
                   : `${Number(current).toFixed(1)} / ${Number(goal).toFixed(1)}`;
               return (
-                <div key={key} className="flex items-center gap-1.5">
-                  <span className="text-gray-500 w-12 shrink-0">{label}</span>
-                  <div className="flex-1 h-1 rounded-full bg-gray-100 overflow-hidden min-w-[40px]">
-                    <div
-                      className="h-full rounded-full"
-                      style={{ width: `${pct}%`, backgroundColor: color }}
+                <Box key={key} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ width: 48, flexShrink: 0 }}>
+                    {label}
+                  </Typography>
+                  <Box sx={{ flex: 1, minWidth: 40 }}>
+                    <LinearProgress
+                      variant="determinate"
+                      value={pct}
+                      sx={{
+                        height: 4,
+                        borderRadius: 2,
+                        bgcolor: '#f0f0f0',
+                        '& .MuiLinearProgress-bar': { bgcolor: color, borderRadius: 2 },
+                      }}
                     />
-                  </div>
-                  <span
-                    className="text-gray-700 font-medium shrink-0"
-                    style={{ fontSize: 10 }}
-                  >
+                  </Box>
+                  <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ flexShrink: 0, fontSize: '0.65rem' }}>
                     {text} {unit}
-                  </span>
-                </div>
+                  </Typography>
+                </Box>
               );
             })}
-          </div>
+          </Stack>
         )}
-        {!hasGoals && <span className="text-gray-500">목표 데이터 없음</span>}
-      </div>
+        {!hasGoals && (
+          <Typography variant="caption" color="text.secondary">
+            목표 데이터 없음
+          </Typography>
+        )}
+      </Paper>
     );
   };
 
   return (
-    <div
-      className="lg:col-span-2 bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col min-h-0 overflow-hidden"
-      style={{ minHeight: 220 }}
+    <Paper
+      elevation={0}
+      sx={{
+        gridColumn: { lg: 'span 1' },
+        border: '1px solid #e8ecf0',
+        borderRadius: 3,
+        p: 2.5,
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 220,
+        overflow: 'hidden',
+      }}
     >
-      <div className="mb-3 shrink-0">
-        <h3 className="text-base font-semibold text-gray-800">
+      <Box sx={{ mb: 2 }}>
+        <Typography fontWeight={700} fontSize="1rem">
           최근 7일 영양 점수
-        </h3>
-        <p className="text-xs mt-0.5 text-gray-500">
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
           일별 영양 균형 점수 (0~100점, 높을수록 균형이 좋음)
-        </p>
-      </div>
-      <div className="flex-1 min-h-0 w-full" style={{ minHeight: 160 }}>
+        </Typography>
+      </Box>
+      <Box sx={{ flex: 1, minHeight: 160, width: '100%' }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={chartData}
             margin={{ top: 8, right: 16, left: 0, bottom: 4 }}
           >
-            <CartesianGrid
-              strokeDasharray="3 3"
-              vertical={false}
-              stroke="#f0f0f0"
-            />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
             <XAxis
               dataKey="day"
               tick={{ fill: '#6b7280', fontSize: 12 }}
@@ -564,17 +741,12 @@ function ActivityScoreChart({ data: scores, summaries, goals }) {
               stroke="#FF8243"
               strokeWidth={2}
               dot={{ r: 4, fill: '#FF8243', stroke: '#fff', strokeWidth: 2 }}
-              activeDot={{
-                r: 5,
-                fill: '#FF8243',
-                stroke: '#fff',
-                strokeWidth: 2,
-              }}
+              activeDot={{ r: 5, fill: '#FF8243', stroke: '#fff', strokeWidth: 2 }}
             />
           </LineChart>
         </ResponsiveContainer>
-      </div>
-    </div>
+      </Box>
+    </Paper>
   );
 }
 

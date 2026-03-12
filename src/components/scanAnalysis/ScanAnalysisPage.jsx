@@ -321,16 +321,26 @@ const App = () => {
 
   return (
     <div className=" w-full bg-[#F2F9F5] flex flex-col items-center font-sans text-[#1E2923]">
-      <header className="w-full max-w-lg mb-1  bg-white rounded-3xl p-2 shadow-xl border border-slate-100">
-        <h1 className="text-[1.75rem] font-bold text-[#1E2923] flex items-center gap-3  ">
-          <div className="w-10 h-10 bg-[#FF8243] rounded-xl flex items-center justify-center text-white shadow-md">
-            <PieChart size={24} />
+      <header className="w-full max-w-lg mb-3">
+        <div className="relative bg-linear-to-br from-white via-orange-50/30 to-white rounded-3xl p-5 shadow-lg border border-orange-100/50 overflow-hidden">
+          {/* 배경 장식 */}
+          <div className="absolute -top-10 -right-10 w-32 h-32 bg-linear-to-br from-[#FF8243]/20 to-transparent rounded-full blur-2xl" />
+          <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-linear-to-tr from-orange-200/30 to-transparent rounded-full blur-xl" />
+
+          <div className="relative flex items-center gap-4">
+            <div className="w-14 h-14 bg-linear-to-br from-[#FF8243] to-[#F97316] rounded-2xl flex items-center justify-center text-white shadow-lg shadow-orange-300/40 ring-4 ring-white">
+              <PieChart size={28} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-[#1E2923] tracking-tight">
+                AI 식단 분석
+              </h1>
+              <p className="text-sm text-[#64748b] mt-0.5 font-medium">
+                식사 사진으로 영양 성분을 즉시 확인하세요
+              </p>
+            </div>
           </div>
-          AI 식단 분석
-        </h1>
-        <p className="text-[#1E2923] text-base mt-2 opacity-90">
-          식사 사진을 업로드하여 식단의 영양 성분을 즉시 확인하세요.
-        </p>
+        </div>
       </header>
 
       <main

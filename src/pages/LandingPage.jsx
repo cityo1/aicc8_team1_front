@@ -72,6 +72,18 @@ export default function LandingPage() {
         </div>
       </div>
 
+      {/* 면책 조항 */}
+      <div className="px-6 pb-8">
+        <div className="max-w-2xl mx-auto p-4 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20">
+          <p className="text-center text-white/80 text-xs leading-relaxed">
+            ⚠️ 본 서비스는 일반적인 건강 정보 제공을 목적으로 하며,{' '}
+            <strong className="text-white">의료 조언, 진단 또는 치료를 대체하지 않습니다.</strong>
+            <br />
+            건강 관련 결정은 반드시 전문 의료진과 상담하시기 바랍니다.
+          </p>
+        </div>
+      </div>
+
       {/* Footer hint */}
       {/* <p className="text-center text-white/70 text-sm pb-6">
         이미 계정이 있으신가요?{' '}
