@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FoodCardRecommend from './FoodCardRecommend';
-import { FaStar, FaSearch } from 'react-icons/fa';
+import { FaStar, FaSearch, FaCircle } from 'react-icons/fa';
 import { TbMessageChatbot } from 'react-icons/tb';
 import { IoMdRefresh } from 'react-icons/io';
 import { LuArrowDownUp, LuCheck } from 'react-icons/lu';
 
 const RecommendPage = () => {
+  const LOADING_DELAY_MS = 1000;
   const navigate = useNavigate();
   const [recommendedFoods, setRecommendedFoods] = useState([]);
 
@@ -20,7 +21,9 @@ const RecommendPage = () => {
 
   const [isSortOpen, setIsSortOpen] = useState(false);
   const sortRef = useRef(null);
+  const listScrollRef = useRef(null);
   const recommendedFoodsRef = useRef(recommendedFoods);
+  const loadingTimerRef = useRef(null);
   recommendedFoodsRef.current = recommendedFoods;
 
   useEffect(() => {
@@ -54,18 +57,15 @@ const RecommendPage = () => {
   };
 
   /**
-   * 중복 여부 확인: 괄호 전(혹은 전체이름)의 앞 4글자가 같은 카드가 있는지 검사
+   * 중복 여부 확인: 괄호 전(혹은 전체이름)이 같은 카드가 있는지 검사
    */
   const isDuplicateByName = (name, existingFoods) => {
     const baseName = getBaseName(name);
     if (!baseName) return false;
 
-    // 비교 기준: 이름의 앞 4글자 (이름이 4글자 미만이면 전체 이름)
-    const prefix = baseName.slice(0, 4);
-
     return existingFoods.some((f) => {
       const existingBase = getBaseName(f.name);
-      return existingBase.slice(0, 4) === prefix;
+      return existingBase === baseName;
     });
   };
 
@@ -80,7 +80,7 @@ const RecommendPage = () => {
     normalized.forEach((food) => {
       // 1. 기존 리스트와 비교
       const isInExisting = isDuplicateByName(food.name, existing);
-      // 2. 현재 새로 추가하려는 리스트 내부에서의 중복 비교 (앞 4글자 기준)
+      // 2. 현재 새로 추가하려는 리스트 내부에서의 중복 비교
       const isInNewToAdd = isDuplicateByName(food.name, toAdd);
 
       if (!isInExisting && !isInNewToAdd) {
@@ -98,7 +98,9 @@ const RecommendPage = () => {
   const normalizeData = (data) => {
     const rawList = Array.isArray(data) ? data : data.foods || [];
     return rawList.map((f) => ({
-      id: f.id || Math.random(),
+      id:
+        f.id ||
+        `${f.name || f.title || 'food'}-${f.kcal || f.calories || 0}-${f.carbs || 0}-${f.protein || 0}-${f.fat || 0}-${f.sugar || 0}`,
       name: f.name || f.title || '이름 없음',
       description: f.description || '',
       tags: f.tags || [],
@@ -129,7 +131,7 @@ const RecommendPage = () => {
     } catch (err) {
       console.error('초기 로드 실패', err);
     } finally {
-      setIsDataLoading(false);
+      stopDataLoadingWithDelay();
     }
   };
 
@@ -148,6 +150,38 @@ const RecommendPage = () => {
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef(null);
+  const [deleteNotice, setDeleteNotice] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const deleteTimerRef = useRef(null);
+
+  const clearLoadingTimer = () => {
+    if (loadingTimerRef.current) {
+      clearTimeout(loadingTimerRef.current);
+      loadingTimerRef.current = null;
+    }
+  };
+
+  const clearDeleteTimer = () => {
+    if (deleteTimerRef.current) {
+      clearTimeout(deleteTimerRef.current);
+      deleteTimerRef.current = null;
+    }
+  };
+
+  const stopDataLoadingWithDelay = () => {
+    clearLoadingTimer();
+    loadingTimerRef.current = setTimeout(() => {
+      setIsDataLoading(false);
+      loadingTimerRef.current = null;
+    }, LOADING_DELAY_MS);
+  };
+
+  useEffect(() => {
+    return () => {
+      clearDeleteTimer();
+      clearLoadingTimer();
+    };
+  }, []);
 
   // 상단 필터 태그 목록
   const filterTags = [
@@ -200,8 +234,37 @@ const RecommendPage = () => {
 
         if (data.foods && data.foods.length > 0) {
           const current = recommendedFoodsRef.current;
+          const incomingCount = data.foods.length;
+          const beforeCount = current.length;
           const merged = mergeRecommendedFoods(data.foods, current);
+          const afterCount = merged.length;
+          const addedCount = Math.max(afterCount - beforeCount, 0);
+
+          if (import.meta.env.DEV) {
+            console.info('[Recommend Debug] 챗봇 추천 수신', {
+              incomingCount,
+              beforeCount,
+              afterCount,
+              addedCount,
+              droppedDuringMerge: Math.max(incomingCount - addedCount, 0),
+              filtersBeforeReset: {
+                searchTerm,
+                finalSearchTerm,
+                selectedTags,
+                isFavoriteView,
+              },
+            });
+          }
+
           setRecommendedFoods(merged);
+          // 챗봇 추천 직후에는 필터로 인해 카드가 숨겨지지 않도록 표시 조건 초기화
+          setSearchTerm('');
+          setFinalSearchTerm('');
+          setSelectedTags([]);
+          setIsFavoriteView(false);
+          requestAnimationFrame(() => {
+            listScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+          });
           triggerLoading();
         }
       }
@@ -223,7 +286,7 @@ const RecommendPage = () => {
 
   const triggerLoading = () => {
     setIsDataLoading(true);
-    setTimeout(() => setIsDataLoading(false), 300);
+    stopDataLoadingWithDelay();
   };
 
   const handleSearch = () => {
@@ -257,8 +320,67 @@ const RecommendPage = () => {
     navigate('/home/dailyLog', { state: { food } });
   };
 
-  const handleDelete = (id) => {
-    setRecommendedFoods((prev) => prev.filter((f) => f.id !== id));
+  const performDelete = (id, name) => {
+    const currentFoods = recommendedFoodsRef.current;
+    const targetIndex = currentFoods.findIndex((f) => f.id === id);
+    if (targetIndex < 0) return;
+
+    const targetFood = currentFoods[targetIndex];
+    setRecommendedFoods(currentFoods.filter((f) => f.id !== id));
+
+    clearDeleteTimer();
+    setDeleteNotice({
+      food: {
+        ...targetFood,
+        name: name || targetFood.name || '음식',
+      },
+      index: targetIndex,
+    });
+    deleteTimerRef.current = setTimeout(() => {
+      setDeleteNotice(null);
+      deleteTimerRef.current = null;
+    }, 5000);
+  };
+
+  const handleDelete = (id, name) => {
+    const currentFoods = recommendedFoodsRef.current;
+    const targetFood = currentFoods.find((f) => f.id === id);
+    if (!targetFood) return;
+
+    if (favorites.includes(id)) {
+      setDeleteConfirm({
+        id,
+        name: name || targetFood.name || '음식',
+      });
+      return;
+    }
+
+    performDelete(id, name || targetFood.name);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteConfirm?.id) return;
+    performDelete(deleteConfirm.id, deleteConfirm.name);
+    setDeleteConfirm(null);
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteConfirm(null);
+  };
+
+  const handleUndoDelete = () => {
+    if (!deleteNotice?.food) return;
+
+    setRecommendedFoods((prev) => {
+      if (prev.some((f) => f.id === deleteNotice.food.id)) return prev;
+      const next = [...prev];
+      const insertIndex = Math.min(deleteNotice.index, next.length);
+      next.splice(insertIndex, 0, deleteNotice.food);
+      return next;
+    });
+
+    clearDeleteTimer();
+    setDeleteNotice(null);
   };
 
   // 필터링 및 정렬 로직
@@ -354,7 +476,7 @@ const RecommendPage = () => {
       </div>
 
       {/* 우측: 리스트 영역 */}
-      <div className="flex-2 flex flex-col min-w-0 h-full overflow-hidden relative pt-1">
+      <div className="flex-2 flex flex-col min-w-0 bg-[#F9FBFA] h-full overflow-hidden relative pt-1 pb-1">
         <div className="shrink-0 space-y-2 mb-3 px-2">
           <div className="flex gap-2 items-center">
             <div className="flex-1 relative">
@@ -455,7 +577,10 @@ const RecommendPage = () => {
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto px-2 custom-scrollbar relative">
+        <div
+          ref={listScrollRef}
+          className="flex-1 min-h-0 overflow-y-auto px-2 custom-scrollbar relative"
+        >
           {isDataLoading && (
             <div className="sticky top-0 inset-x-0 h-full flex items-center justify-center bg-gray-50/50 z-20">
               <div className="w-8 h-8 border-4 border-[#FF8243] border-t-transparent rounded-full animate-spin"></div>
@@ -464,25 +589,79 @@ const RecommendPage = () => {
 
           {displayFoods.length > 0 ? (
             <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-              {displayFoods.map((food) => (
+              {displayFoods.map((food, index) => (
                 <FoodCardRecommend
-                  key={food.id}
+                  key={`${food.id}-${food.name}-${index}`}
                   food={food}
                   isFavorite={favorites.includes(food.id)}
                   onToggleFavorite={() => toggleFavorite(food.id)}
-                  onDelete={() => handleDelete(food.id)}
+                  onDelete={(id, name) => handleDelete(id, name)}
                   onToggleCheck={() => handleToggleCheck(food)}
                 />
               ))}
             </div>
           ) : (
             !isDataLoading && (
-              <div className="flex flex-col items-center justify-center py-20 text-gray-400 bg-white rounded-2xl border border-dashed border-gray-200">
-                <p className="text-sm font-medium">검색 결과가 없습니다.</p>
+              <div className="flex flex-col items-center justify-center py-20 text-gray-400 bg-white rounded-2xl border border-dashed border-gray-200 h-full">
+                <p className="text-[16px] font-medium mb-80">
+                  결과가 없습니다.
+                </p>
               </div>
             )
           )}
         </div>
+
+        {deleteNotice && (
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 w-[calc(100%-1rem)] max-w-[515px] bg-gray-800 text-white rounded-lg px-4 py-3 shadow-lg flex items-center justify-between gap-3">
+            <div className="ml-1">
+              <FaCircle size={12} color="#FF8243" />
+            </div>
+            <p className="text-[15px] min-w-0 flex-1">
+              <span className="inline-block max-w-[230px] truncate align-bottom font-bold">
+                {deleteNotice.food.name}
+              </span>
+              <span> 이(가) 삭제되었습니다</span>
+            </p>
+            <button
+              onClick={handleUndoDelete}
+              className="shrink-0 px-3 py-1 rounded-md text-[15px] underline font-semibold text-[#FF8243]"
+            >
+              취소
+            </button>
+          </div>
+        )}
+
+        {deleteConfirm && (
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-gray-500/25 rounded-2xl">
+            <div className="w-[92%] max-w-[380px] rounded-xl bg-white shadow-xl border border-gray-100">
+              <p className="text-[16px] font-bold text-[#1E2923] mb-2 pl-3 pr-3 pt-3">
+                정말로 지우시겠습니까?
+              </p>
+              <div className="h-[1.5px] bg-[#FF8243] m-2" />
+              <p className="text-[14px] text-gray-500 mb-5 pl-3 pr-3 pb-1">
+                <span> 고정한 </span>
+                <span className="font-semibold text-gray-700">
+                  {deleteConfirm.name}
+                </span>
+                <span> 이(가) 삭제됩니다.</span>
+              </p>
+              <div className="flex justify-end gap-3 pb-3 pr-3">
+                <button
+                  onClick={handleCancelDelete}
+                  className="px-3  py-2 rounded-lg border border-gray-200 text-gray-600 text-[14px] font-medium hover:bg-gray-50"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  className="px-3 py-2 rounded-lg bg-[#FF8243] text-white text-[14px] font-semibold hover:bg-[#e6753d] "
+                >
+                  삭제
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

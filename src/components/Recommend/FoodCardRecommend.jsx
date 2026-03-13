@@ -9,6 +9,7 @@ const FoodCardRecommend = ({
   isFavorite,
   onToggleFavorite,
   onDelete,
+  onToggleCheck,
 }) => {
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [tags, setTags] = useState([]);
@@ -113,7 +114,7 @@ const FoodCardRecommend = ({
             e.stopPropagation();
             onToggleFavorite(food.id);
           }}
-          className="focus:outline-none p-2"
+          className="focus:outline-none p-1.5"
         >
           {isFavorite ? (
             <FaStar size={23} color="#FF8243" />
@@ -209,13 +210,13 @@ const FoodCardRecommend = ({
             e.stopPropagation();
             onDelete(food.id, food.name);
           }}
-          className="p-1 text-gray-300 hover:text-gray-700"
+          className="p-1 text-gray-300 hover:text-gray-700 mt-1"
         >
           <TbTrashX size={23} />
         </button>
 
         <div className="flex flex-1 gap-5">
-          <button
+          {/* <button
             onClick={(e) => {
               e.stopPropagation();
               console.log(food, '비슷한 음식 보기');
@@ -223,14 +224,18 @@ const FoodCardRecommend = ({
             className="flex-1 py-1.5 bg-[#ffffff] text-[#FF8243] font-semibold rounded-xl shadow-sm border-2 border-[#FF8243] text-[15px] hover:bg-gray-50 transition-colors whitespace-nowrap"
           >
             비슷한 음식 보기
-          </button>
+          </button> */}
 
           <button
             onClick={(e) => {
               e.stopPropagation();
-              navigate('/home/dailyLog');
+              if (onToggleCheck) {
+                onToggleCheck();
+                return;
+              }
+              navigate('/home/dailyLog', { state: { food } });
             }}
-            className="flex-1 py-1.5 bg-[#FF8243] border-2 border-[#FF8243] text-white font-bold rounded-xl shadow-sm hover:bg-[#e6753d] hover:border-[#e6753d] transition-colors text-[15px] whitespace-nowrap"
+            className="flex-1 py-1.5 bg-[#FF8243] border-2 border-[#FF8243] text-white font-bold rounded-xl shadow-sm hover:bg-[#e6753d] hover:border-[#e6753d] transition-colors text-[15px] whitespace-nowrap ml-auto max-w-[150px]"
           >
             선택하기
           </button>
